@@ -5822,7 +5822,7 @@ fn order_text(game: &Game, earlier: &[Order], o: &Order) -> String {
         Order::Leapfrog { state } => format!("Leapfrog {}: its people emit {:.2} less per hundred million", game.tables.state(*state).name, game.tables.climate.population_emissions_per_level * game.tables.units_per_hundred_million()),
         // Ticket #622 (version 0.1.0.5): the growth and the point, in the note.
         Order::StripPermit { state } => format!("Strip Permit in {}: three turns of double output, no growth there, a point off with every rival", game.tables.state(*state).name),
-        Order::ExodusCall { state } => format!("Exodus Call in {}: a doubled muster at the ordinary cost in people", game.tables.state(*state).name),
+        Order::ExodusCall { state } => format!("Exodus Call in {}: a doubled muster", game.tables.state(*state).name),
         // Ticket #192 (version 0.08.0): the Upload.
         Order::Upload { colony, n } => format!("Upload {} into the Archive at {}", counted(n, "Colonist", "Colonists"), game.place_name(Place::Colony(*colony))),
     }
@@ -8458,7 +8458,9 @@ fn policies_block(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, act
             cost_button(ui, game, &session.pending, Order::ExodusCall { state: sid }, "Exodus Call", actions);
             ui.label(
                 RichText::new(format!(
-                    "{} recruiting {} here instead of {}, and each costs this Region the ordinary population rather than your half again. Once per Region, ever.",
+                    // Ticket #638 (version 0.1.0.6): Coach Class charges no extra population now, so
+                    // the clause that said the Call suspended it is gone.
+                    "{} recruiting {} here instead of {}. Once per Region, ever.",
                     counted(t.turns, "turn", "turns"),
                     counted(game.emigrants_per_turn(Seat(0)) * t.muster_multiplier, "Pioneer", "Pioneers"),
                     game.emigrants_per_turn(Seat(0))
@@ -13575,9 +13577,9 @@ mod tests {
         assert_eq!(start_goods(&tables, FactionKind::Custodians), vec![(80, "materials", "Materials"), (20, "fuel", "Fuel"), (20, "energy", "Energy")]);
         // Ticket #585 (version 0.1.0.4): the Arkwrights' and Archivists' 10 Ducats, the glyph line
         // the one place the card says it.
-        for kind in [FactionKind::Arkwrights, FactionKind::Archivists] {
-            assert_eq!(start_goods(&tables, kind), vec![(80, "materials", "Materials"), (20, "fuel", "Fuel"), (20, "energy", "Energy"), (10, "ducats", "Ducats")], "{kind:?}");
-        }
+        // Ticket #638 (version 0.1.0.6): the Arkwrights' 50 Fuel, and the Archivists' 25 Ducats.
+        assert_eq!(start_goods(&tables, FactionKind::Arkwrights), vec![(80, "materials", "Materials"), (50, "fuel", "Fuel"), (20, "energy", "Energy"), (10, "ducats", "Ducats")]);
+        assert_eq!(start_goods(&tables, FactionKind::Archivists), vec![(80, "materials", "Materials"), (20, "fuel", "Fuel"), (20, "energy", "Energy"), (25, "ducats", "Ducats")]);
     }
 
     /// Ticket #543 (version 0.1.0.1): a Colony Ship with one to three aboard is drawn yellow, the

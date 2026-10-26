@@ -975,8 +975,9 @@ fn occupation_of_a_controlled_state_returns_it_to_its_owner_when_broken() {
 fn meet_first(g: &mut Game, seat: Seat) {
     match g.kind(seat) {
         // Ticket #506 (version 0.1.0.0): the fifty-turn bars. Ticket #580 (version 0.1.0.3): 4,250.
-        // Ticket #584 (version 0.1.0.4): 5,000. Ticket #623 (version 0.1.0.5): 6,250.
-        FactionKind::Prospectors => g.seats[seat.index()].venture_fund = 6250.0,
+        // Ticket #584 (version 0.1.0.4): 5,000. Ticket #623 (version 0.1.0.5): 6,250. Ticket #638
+        // (version 0.1.0.6): 6,500.
+        FactionKind::Prospectors => g.seats[seat.index()].venture_fund = 6500.0,
         FactionKind::Custodians => g.seats[seat.index()].stabilization_run = 4,
         FactionKind::Arkwrights => {}
         // Ticket #579 (the review): the first part is scored on the fund, read from the table.
@@ -1946,7 +1947,7 @@ fn the_prospectors_fund_counts_seven_tenths_of_their_score() {
     assert_eq!(g.kind(pro), FactionKind::Prospectors);
     bare_stations(&mut g);
     colony(&mut g, pro, BodyId::Mars, &[ModuleKind::Habitat; 4], 20);
-    g.seats[1].venture_fund = 1062.5; // 0.17 x 6,250 (ticket #623)
+    g.seats[1].venture_fund = 1105.0; // 0.17 x 6,500 (ticket #638; 6,250 in ticket #623)
     let p = g.progress(pro);
     assert!((p.first_fraction() - 0.17).abs() < 1e-9 && p.second_fraction() == 1.0, "the premise: the Fund at 17%, the Presence full: {p:?}");
     // Ticket #601 (version 0.1.0.4): of the 94% the parts share, the gate not standing: 39%.
@@ -2243,16 +2244,17 @@ fn archive_at(g: &mut Game, seat: Seat, body: BodyId, paid: i64, colonists: u32)
 }
 
 #[test]
-fn coach_class_doubles_an_arkwright_colony_ships_load_and_cuts_its_price() {
+fn coach_class_raises_an_arkwright_colony_ships_load_and_cuts_its_price() {
     let mut g = game();
     // Capacity: the card figure for everyone else, twice it for the Arkwrights, and Expanded
     // Habitats adds its two before the doubling.
     assert_eq!(g.colony_ship_capacity(Seat(0)), 4);
-    // Ticket #513 (version 0.1.0.0): half again, where it was twice (8).
-    assert_eq!(g.colony_ship_capacity(Seat(2)), 6, "Coach Class carries half again");
+    // Ticket #513 (version 0.1.0.0): half again, where it was twice (8). Ticket #638 (version
+    // 0.1.0.6): a quarter again.
+    assert_eq!(g.colony_ship_capacity(Seat(2)), 5, "Coach Class carries a quarter again");
     g.research.done.push(TechId::ExpandedHabitats);
     assert_eq!(g.colony_ship_capacity(Seat(0)), 6);
-    assert_eq!(g.colony_ship_capacity(Seat(2)), 9, "(4 + 2) x 1.5, 12 until ticket #513");
+    assert_eq!(g.colony_ship_capacity(Seat(2)), 7, "(4 + 2) x 1.25 = 7.5, rounded down (9 until ticket #638, 12 until #513)");
     // Price: 30 Materials on the units.toml row; ticket #83 (version 0.06.0): the Arkwrights' 20
     // is retired and every Ship costs them 15% less, so 25.
     let build = Order::BuildShip { nuclear: false, site: Place::State(StateId::EastAsia), kind: UnitKind::ColonyShip };
@@ -2266,25 +2268,26 @@ fn coach_class_doubles_an_arkwright_colony_ships_load_and_cuts_its_price() {
     g.state_mut(sid).emigrants = 13;
     let ship = a_colony_ship(&mut g, Seat(2), BodyId::Earth);
     let load = |n: u32| Order::Load { ship, colonists: n, from: LoadSource::State(sid), army: None };
-    // Ticket #513 (version 0.1.0.0): nine with Expanded Habitats, where it was twelve.
-    assert!(g.check_order(Seat(2), &[], &load(9)).is_ok());
-    let err = g.check_order(Seat(2), &[], &load(10)).unwrap_err();
-    assert_eq!(err.0, "this Ship carries at most 9 Colonists");
+    // Ticket #513 (version 0.1.0.0): nine with Expanded Habitats, where it was twelve; seven since
+    // ticket #638.
+    assert!(g.check_order(Seat(2), &[], &load(7)).is_ok());
+    let err = g.check_order(Seat(2), &[], &load(8)).unwrap_err();
+    assert_eq!(err.0, "this Ship carries at most 7 Colonists");
 }
 
 #[test]
-fn an_arkwright_muster_takes_twice_the_population_out_of_its_state() {
+fn an_arkwright_muster_takes_the_ordinary_population_out_of_its_state() {
     let mut g = game();
     g.state_mut(StateId::NorthAfrica).control = Control::Controlled(Seat(2));
     g.state_mut(StateId::NorthAfrica).facilities.retain(|f| f.kind != FacilityKind::LaunchSite);
     g.state_mut(StateId::NorthAfrica).facilities.push(facility(FacilityKind::LaunchSite));
     assert!((g.lift_population(Seat(0), 4) - 4.0).abs() < 1e-9, "one unit each: one million people since ticket #333 (version 0.09.0), five million from ticket #143 (version 0.07.3)");
-    assert!((g.lift_population(Seat(2), 4) - 6.0).abs() < 1e-9, "Coach Class costs the state half again (twice until ticket #513)");
+    assert!((g.lift_population(Seat(2), 4) - 4.0).abs() < 1e-9, "a Pioneer costs them what it costs anybody since ticket #638 (half again until then, twice until #513)");
     // Ticket #73: the population is paid when the Emigrants muster, and the lift takes none.
     let before = g.state(StateId::NorthAfrica).population;
     g.commit_orders(Seat(2), &[Order::BuildEmigrants { state: StateId::NorthAfrica, n: 4 }]);
     let taken = before - g.state(StateId::NorthAfrica).population;
-    assert!((taken - 6.0).abs() < 1e-9, "the recruit took {taken}, not 6.0 (one and a half units of one million per Pioneer under Coach Class since ticket #513)");
+    assert!((taken - 4.0).abs() < 1e-9, "the recruit took {taken}, not 4.0 (one unit of one million per Pioneer since ticket #638)");
     let after_muster = g.state(StateId::NorthAfrica).population;
     let ship = a_colony_ship(&mut g, Seat(2), BodyId::Earth);
     g.commit_orders(Seat(2), &[Order::Load { ship, colonists: 4, from: LoadSource::State(StateId::NorthAfrica), army: None }]);
@@ -2294,7 +2297,7 @@ fn an_arkwright_muster_takes_twice_the_population_out_of_its_state() {
 }
 
 #[test]
-fn an_arkwright_habitat_holds_twelve() {
+fn an_arkwright_habitat_holds_a_quarter_again() {
     let mut g = game();
     // Ticket #80 (version 0.06.0): a Habitat holds 8, the Arkwrights' 12. The Moon's Habitat yield
     // of 1.1 made those 8 and 13 until ticket #140 (version 0.07.3) traded the yield away: a
@@ -2306,32 +2309,33 @@ fn an_arkwright_habitat_holds_twelve() {
     let core = g.tables.module(ModuleKind::Core).holds_colonists;
     // Ticket #207 (version 0.08.1): 4 and 6, and with Expanded Habitats 8 and 12.
     assert_eq!(g.habitat_room(g.colony(mine).unwrap()), 4 + core);
-    assert_eq!(g.habitat_room(g.colony(theirs).unwrap()), 6 + core, "half again for the Arkwrights");
+    assert_eq!(g.habitat_room(g.colony(theirs).unwrap()), 5 + core, "a quarter again for the Arkwrights (ticket #638; half again before)");
     g.research.done.push(TechId::ExpandedHabitats);
     assert_eq!(g.habitat_room(g.colony(mine).unwrap()), 8 + core);
-    assert_eq!(g.habitat_room(g.colony(theirs).unwrap()), 12 + core, "(4 + 4) x 1.5, and the Core Module still four");
+    assert_eq!(g.habitat_room(g.colony(theirs).unwrap()), 10 + core, "(4 + 4) x 1.25, and the Core Module still four");
 }
 
 #[test]
-fn an_arkwright_pays_half_for_a_station_and_three_quarters_for_a_module() {
+fn an_arkwright_pays_three_quarters_for_a_station_and_for_a_module() {
     let mut g = game();
     let station = g.station_order(Seat(0), BodyId::Earth, 3, &[]);
     assert_eq!(g.order_cost(Seat(0), &station).materials, 44.0, "40 x 1.1 since ticket #537");
-    assert_eq!(g.order_cost(Seat(2), &station).materials, 22.0, "they start with no station");
+    assert_eq!(g.order_cost(Seat(2), &station).materials, 33.0, "they start with no station: x0.75 since ticket #638, x0.5 before");
     let cid = colony(&mut g, Seat(2), BodyId::Moon, &[], 0);
     let mine = colony(&mut g, Seat(0), BodyId::Moon, &[], 0);
     for (kind, full, theirs) in [(ModuleKind::Habitat, 27.5, 20.6), (ModuleKind::Mine, 22.0, 16.5), (ModuleKind::Shipyard, 38.5, 28.9)] {
         assert_eq!(g.order_cost(Seat(0), &Order::BuildModule { colony: mine, kind }).materials, full);
         assert_eq!(g.order_cost(Seat(2), &Order::BuildModule { colony: cid, kind }).materials, theirs, "{} x 0.75, to the tenth (ticket #387)", kind.name());
     }
-    // Transit Fuel too: three quarters, then Efficient Transit on top of that. Ticket #57: on the
-    // window the crossing pays the card's Fuel, and both multipliers apply after the window factor.
+    // Transit Fuel too: four fifths since ticket #638 (three quarters before), then Efficient Transit
+    // on top of that. Ticket #57: on the window the crossing pays the card's Fuel, and both
+    // multipliers apply after the window factor.
     at_window(&mut g);
     assert_eq!(g.transit_cost_for(Seat(0), BodyId::Earth, BodyId::Mars).1, 18.1);
-    assert_eq!(g.transit_cost_for(Seat(2), BodyId::Earth, BodyId::Mars).1, 13.6);
+    assert_eq!(g.transit_cost_for(Seat(2), BodyId::Earth, BodyId::Mars).1, 14.5, "18.1 x 0.8, to the tenth");
     g.research.done.push(TechId::EfficientTransit);
     // Ticket #527 (version 0.1.0.0): Efficient Transit x0.75, from x0.6.
-    assert_eq!(g.transit_cost_for(Seat(2), BodyId::Earth, BodyId::Mars).1, 10.2, "18.1 x 0.75 x 0.75, to the tenth");
+    assert_eq!(g.transit_cost_for(Seat(2), BodyId::Earth, BodyId::Mars).1, 10.9, "18.1 x 0.8 x 0.75, to the tenth");
 }
 
 #[test]
@@ -6411,20 +6415,21 @@ fn twenty_five_hundred_ducats_in_the_fund_is_the_prospectors_first_part() {
     // Ticket #506 (version 0.1.0.0): 3,500, from 2,500. Ticket #580 (version 0.1.0.3), at the
     // designer's word: 4,250, with the race for the Moon putting the Prospectors at 56 wins of 80.
     // Ticket #584 (version 0.1.0.4), at the designer's word: 5,000, the Prospectors at 41 of 80 on
-    // 0.1.0.3's closing board. Ticket #623 (version 0.1.0.5), at the designer's word: 6,250.
-    assert_eq!((card.kind, card.bar), (dying_earth_engine::data::VictoryFirstKind::VentureFund, 6250.0));
+    // 0.1.0.3's closing board. Ticket #623 (version 0.1.0.5), at the designer's word: 6,250. Ticket
+    // #638 (version 0.1.0.6), at the designer's word: 6,500.
+    assert_eq!((card.kind, card.bar), (dying_earth_engine::data::VictoryFirstKind::VentureFund, 6500.0));
     assert_eq!(card.kind.name(), "Venture Capital Fund");
     // Ticket #580: the card's long text reads the bar, where it carried a typed copy; the
     // computer Prospectors' pace stretches with it (467 / 1167 / 2100 / 3500 before, then
     // 567 / 1417 / 2550 / 4250).
-    assert_eq!(g.tables.victory_text(FactionKind::Prospectors), "6,250 Ducats in the Venture Capital Fund, plus 20 Colonists living beyond Earth orbit.");
-    assert_eq!(g.tables.ai_pace(FactionKind::Prospectors).first, vec![[12, 834], [25, 2084], [37, 3750], [47, 6250]], "scaled by 6250/5000, the turns as they were");
-    g.seats[pro.index()].venture_fund = 2500.0;
+    assert_eq!(g.tables.victory_text(FactionKind::Prospectors), "6,500 Ducats in the Venture Capital Fund, plus 20 Colonists living beyond Earth orbit.");
+    assert_eq!(g.tables.ai_pace(FactionKind::Prospectors).first, vec![[12, 867], [25, 2167], [37, 3900], [47, 6500]], "scaled by 6500/6250, the turns as they were");
+    g.seats[pro.index()].venture_fund = 2600.0; // four tenths of 6,500 (ticket #638)
     let p = g.progress(pro);
-    assert_eq!((p.first_value, p.first_bar), (2500.0, 6250.0));
+    assert_eq!((p.first_value, p.first_bar), (2600.0, 6500.0));
     assert!((p.first_fraction() - 0.4).abs() < 1e-9);
     colony(&mut g, pro, BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 20);
-    g.seats[pro.index()].venture_fund = 6250.0;
+    g.seats[pro.index()].venture_fund = 6500.0;
     open_gates(&mut g);
     assert!(g.progress(pro).met());
     g.end_phase();
@@ -6596,7 +6601,7 @@ fn emigrants_muster_four_a_turn_per_faction_in_one_state_at_one_unit_of_populati
     assert_eq!(g.emigrants_per_turn(Seat(0)), 2);
     // Ticket #513 (version 0.1.0.0): three a state at half again the population, from four at twice.
     assert_eq!(g.emigrants_per_turn(Seat(2)), 3, "the Arkwrights recruit three a state");
-    assert!((g.lift_population(Seat(2), 4) - 6.0).abs() < 1e-9, "at half again the population");
+    assert!((g.lift_population(Seat(2), 4) - 4.0).abs() < 1e-9, "at the ordinary population since ticket #638");
 }
 
 /// Ticket #73 (b): a Launch Site lifts only the Emigrants waiting in its state; the population was
@@ -6864,7 +6869,7 @@ fn observatory_stands_on_a_station_and_a_barracks_does_not() {
 /// four -- neither the Arkwrights' multiplier nor Expanded Habitats reaches it. So every figure here
 /// is the Habitat's, plus the same four.
 #[test]
-fn a_habitat_holds_four_and_six_for_the_arkwrights_and_the_core_module_four_flat() {
+fn a_habitat_holds_four_and_five_for_the_arkwrights_and_the_core_module_four_flat() {
     let mut g = game();
     let iss = station_of(&g, Seat(0), BodyId::Earth).unwrap();
     let core = g.tables.module(ModuleKind::Core).holds_colonists;
@@ -6874,9 +6879,9 @@ fn a_habitat_holds_four_and_six_for_the_arkwrights_and_the_core_module_four_flat
     assert_eq!(g.habitat_room(g.colony(iss).unwrap()), 4 + core);
     // The Arkwrights (seat 2) start with no station: hand them the ISS for the reading.
     g.colony_mut(iss).unwrap().control = Control::Controlled(Seat(2));
-    assert_eq!(g.habitat_room(g.colony(iss).unwrap()), 6 + core, "half again for the Arkwrights, and the Core Module flat");
+    assert_eq!(g.habitat_room(g.colony(iss).unwrap()), 5 + core, "a quarter again for the Arkwrights (ticket #638), and the Core Module flat");
     with_tech(&mut g, TechId::ExpandedHabitats);
-    assert_eq!(g.habitat_room(g.colony(iss).unwrap()), 12 + core, "(4 + 4) x 1.5, and the Core Module still four");
+    assert_eq!(g.habitat_room(g.colony(iss).unwrap()), 10 + core, "(4 + 4) x 1.25, and the Core Module still four");
 }
 
 // ---------------------------------------------------------------- 0.06.0 ticket #81: the Archivists' card
@@ -7206,7 +7211,7 @@ fn the_gates_general_bonuses_are_for_everyone() {
     assert_eq!(g.colony_ship_capacity(cus), 4);
     with_tech(&mut g, TechId::GenerationShips);
     assert_eq!(g.colony_ship_capacity(cus), 6);
-    assert_eq!(g.colony_ship_capacity(Seat(2)), 9, "(4 + 2) x 1.5 for the Arkwrights (ticket #513; x 2 = 12 before)");
+    assert_eq!(g.colony_ship_capacity(Seat(2)), 7, "(4 + 2) x 1.25 for the Arkwrights, rounded down (ticket #638; x 1.5 = 9 before)");
     let sink = g.emissions_now().sink;
     with_tech(&mut g, TechId::PlanetaryStewardship);
     assert!((g.emissions_now().sink - sink - 1.5).abs() < 1e-9, "the Sink grows by 1.5: {} then {}", sink, g.emissions_now().sink);
@@ -7279,7 +7284,7 @@ fn a_warming_earth_lets_a_colony_ship_lift_beyond_its_capacity() {
     }
     g.climate.temperature = 2.6;
     assert_eq!(g.colony_ship_crowded_capacity(Seat(0)), 8, "4 + 4");
-    assert_eq!(g.colony_ship_crowded_capacity(Seat(2)), 10, "the Arkwrights' 6 + 4, not + 6 (8 + 4 until ticket #513)");
+    assert_eq!(g.colony_ship_crowded_capacity(Seat(2)), 9, "the Arkwrights' 5 + 4 (6 + 4 until ticket #638)");
     g.state_mut(StateId::EastAsia).emigrants = 12;
     let (ship, _) = colony_ship_ready(&mut g, BodyId::Earth);
     g.ship_mut(ship).unwrap().colonists = 0;
@@ -7740,7 +7745,7 @@ fn a_mass_driver_cuts_the_owners_departures_by_a_quarter_and_gives_its_mines_one
     assert_eq!(g.transit_cost_for(Seat(1), BodyId::Moon, BodyId::Earth).1, 3.7, "a rival pays the leg");
     let ark = Seat(2);
     colony(&mut g, ark, BodyId::Moon, &[ModuleKind::MassDriver], 0);
-    assert_eq!(g.transit_cost_for(ark, BodyId::Moon, BodyId::Earth).1, 2.1, "3.7 x 0.75 = 2.8 for the Arkwrights, x 0.75 again");
+    assert_eq!(g.transit_cost_for(ark, BodyId::Moon, BodyId::Earth).1, 2.3, "3.7 x 0.8 = 3.0 for the Arkwrights (ticket #638), x 0.75 again");
     assert_eq!(g.module_yield(cus, moon, ModuleKind::Mine).amount, 6.0, "4 x 1.25 = 5, +1 (ticket #554)");
     g.colony_mut(moon).unwrap().modules[1].mothballed = true;
     assert_eq!(g.transit_cost_for(cus, BodyId::Moon, BodyId::Earth).1, 3.7, "mothballed, it throws nothing");
@@ -11991,23 +11996,23 @@ fn a_rival_closing_on_its_victory_condition_interrupts_the_player_once_a_step() 
     // since Presence is 20 and 15 of 20 would read under three quarters. Ticket #623 (version
     // 0.1.0.5): 5,000 of 6,250, the same four fifths.
     colony(&mut g, pro, BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 16);
-    g.seats[pro.index()].venture_fund = 5000.0;
+    g.seats[pro.index()].venture_fund = 5200.0; // four fifths of 6,500 (ticket #638)
     // Ticket #555 (version 0.1.0.2): the score is the mean of the parts, past three quarters; the
     // Fund is still the shorter part, which the Moment names. Ticket #567 (version 0.1.0.3): the Fund
     // counts 0.7 of it, 0.7 x 0.8 + 0.3 x 16/20 (ticket #625: 16 of 20; ticket #623: 5,000 of 6,250).
-    assert!((g.progress(pro).score() - 0.94 * (0.7 * 5000.0 / 6250.0 + 0.3 * 16.0 / 20.0)).abs() < 1e-9, "{}", g.progress(pro).score());
+    assert!((g.progress(pro).score() - 0.94 * (0.7 * 5200.0 / 6500.0 + 0.3 * 16.0 / 20.0)).abs() < 1e-9, "{}", g.progress(pro).score());
     assert!(g.progress(pro).score() >= 0.75);
     g.end_phase();
     assert_eq!(fired(&g), 1, "three quarters: the Moment fires: {:?}", g.report.moments);
     let m = g.report.moments.iter().find(|m| m.kind == MomentKind::RivalProgress).unwrap();
     assert!(m.text.contains("Prospectors") && m.text.contains("three quarters"), "{}", m.text);
     // Ticket #506 (version 0.1.0.0): the Fund, at 0.75, is the shorter part now; Presence is 14 of 18 (16 of 20 since ticket #625).
-    assert!(m.text.contains("5000 of 6250"), "the part still short is the figure: {}", m.text);
-    assert_eq!(m.figure, "5000 of 6250");
+    assert!(m.text.contains("5200 of 6500"), "the part still short is the figure: {}", m.text);
+    assert_eq!(m.figure, "5200 of 6500");
     g.end_phase();
     assert_eq!(fired(&g), 1, "once: it does not fire again while the seat sits there");
     // The Fund full but its gate shut is held back, not met.
-    g.seats[pro.index()].venture_fund = 6250.0;
+    g.seats[pro.index()].venture_fund = 6500.0;
     g.end_phase();
     assert_eq!(fired(&g), 1, "a part held back by its gate Tech is not a part met");
     // The gate open: one part met, the other short.
@@ -12271,7 +12276,7 @@ fn the_shared_pots_penalty_never_scars_a_pair() {
 /// deepened the very thing that leaves them winning 3 games of 80. So a Call SUSPENDS the double
 /// charge while it runs: they move twice the people at the ordinary price in population.
 #[test]
-fn an_exodus_call_doubles_the_muster_and_suspends_the_double_cost() {
+fn an_exodus_call_doubles_the_muster_at_the_ordinary_cost() {
     let mut g = game();
     let ark = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Arkwrights).unwrap();
     let sid = g.controlled_states(ark)[0];
@@ -12286,10 +12291,11 @@ fn an_exodus_call_doubles_the_muster_and_suspends_the_double_cost() {
     assert!(g.exodus_call_running(sid), "it runs from the turn it is sounded");
     assert_eq!(g.emigrants_per_turn_in(ark, sid), plain * 2, "six, not three (eight, not four, until ticket #513)");
 
-    // The whole point: eight people cost what eight people cost anybody else.
+    // Eight people cost what eight people cost anybody else. Ticket #638 (version 0.1.0.6): Coach
+    // Class charges no more than that now, so the suspension changes nothing.
     let each = g.tables.emigrants.population_each;
-    assert!((g.muster_population_in(ark, sid, 8) - each * 8.0).abs() < 1e-9, "the ordinary price, not their double");
-    assert!(g.muster_population_in(ark, sid, 8) < g.lift_population(ark, 8), "which is strictly less than Coach Class charges");
+    assert!((g.muster_population_in(ark, sid, 8) - each * 8.0).abs() < 1e-9, "the ordinary price");
+    assert!((g.muster_population_in(ark, sid, 8) - g.lift_population(ark, 8)).abs() < 1e-9, "which is what Coach Class charges since ticket #638");
 
     // Elsewhere they are unchanged: the Call is a Region's, not a Faction's.
     let other = g.controlled_states(ark).into_iter().find(|s| *s != sid);
@@ -16964,8 +16970,9 @@ fn ticket_350_the_turn_one_line_names_each_factions_own_condition() {
             "Build, spread Influence and reach Stabilization, four Climate phases running with Emissions under the Natural Sink, with 20 Colonists living beyond Earth orbit, before +3.0 C.",
         ),
         // Ticket #506 (version 0.1.0.0): the fifty-turn bars.
-        // Ticket #584 (version 0.1.0.4): the Fund 5,000. Ticket #623 (version 0.1.0.5): 6,250.
-        (FactionKind::Prospectors, "Build, spread Influence and put 6,250 Ducats in the Venture Capital Fund with 20 Colonists living beyond Earth orbit, before +3.0 C."),
+        // Ticket #584 (version 0.1.0.4): the Fund 5,000. Ticket #623 (version 0.1.0.5): 6,250. Ticket
+        // #638 (version 0.1.0.6): 6,500.
+        (FactionKind::Prospectors, "Build, spread Influence and put 6,500 Ducats in the Venture Capital Fund with 20 Colonists living beyond Earth orbit, before +3.0 C."),
         // Ticket #514 (version 0.1.0.0): and a Colonial Capital.
         (FactionKind::Arkwrights, "Build, spread Influence and get 44 Colonists living beyond Earth orbit, spread over four Bodies, one holding a Colonial Capital, before +3.0 C."),
         (FactionKind::Archivists, "Build, spread Influence and build the Archive on the ground beyond Earth orbit, pay 250 Research into it, and upload 16 Colonists, before +3.0 C."), // Ticket #565 (version 0.1.0.3): 16, from 18; ticket #579: 250, from 225
@@ -20692,7 +20699,8 @@ fn the_arkwrights_computer_is_paced_in_bodies() {
     g.state_mut(home).emigrants = 4;
     let slot = g.free_orbital_slots(BodyId::Earth)[0];
     let id = ColonyId(g.fresh_id());
-    let modules: Vec<Module> = std::iter::once(ModuleKind::Core).chain(std::iter::repeat_n(ModuleKind::Habitat, 5)).map(Module::new).collect();
+    // Ticket #638 (version 0.1.0.6): six Habitats, which hold 30 at a quarter again, where five held 30 at half again.
+    let modules: Vec<Module> = std::iter::once(ModuleKind::Core).chain(std::iter::repeat_n(ModuleKind::Habitat, 6)).map(Module::new).collect();
     g.colonies.push(Colony { id, body: BodyId::Earth, slot, control: Control::Controlled(ark), modules, colonists: 32, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, tier: 0, in_orbit: true });
     // Ticket #506 (version 0.1.0.0): read at turn 25, where the pace wants one Body and 31 off Earth:
     // thirty-two aboard are on pace for the first part and short of a Body, which is what halves the
@@ -23112,10 +23120,10 @@ fn the_arkwright_computer_gathers_people_at_its_capital_candidate() {
     assert!((mine_lifted - mine_plain * chase).abs() < 1e-6, "the candidate's Module at {chase}x: {mine_lifted} against {mine_plain}");
     // The log carries a score to a tenth, so the lifted figure is within three tenths of the product.
     assert!((crossing_lifted - crossing_plain * chase).abs() <= 0.3, "the crossing to its Body at {chase}x: {crossing_lifted} against {crossing_plain}");
-    // No room at the candidate (the Core's 4 and two Arkwright Habitats of 6): the crossing falls
+    // No room at the candidate (the Core's 4 and two Arkwright Habitats of 5): the crossing falls
     // back, the Module does not.
     let room = g.habitat_room(g.colony(mars).unwrap());
-    assert_eq!(room, 16, "4 + 6 + 6");
+    assert_eq!(room, 14, "4 + 5 + 5 (ticket #638)");
     g.colony_mut(mars).unwrap().colonists = room;
     g.log.clear();
     g.ai_orders(ark);
@@ -24080,7 +24088,7 @@ fn prospectors_at_eighty(g: &mut Game) -> Seat {
     let w = g.tables.faction(FactionKind::Prospectors).victory_first.weight;
     // Ticket #601 (version 0.1.0.4): the parts are 94% of the score, the gate not standing.
     let parts = 0.8 / (1.0 - g.tables.victory.gate_weight);
-    g.seats[1].venture_fund = 6250.0 * (parts - (1.0 - w) * presence) / w; // ticket #623: the bar 6,250
+    g.seats[1].venture_fund = 6500.0 * (parts - (1.0 - w) * presence) / w; // ticket #638: the bar 6,500
     assert!((g.progress(pro).score() - 0.8).abs() < 1e-9, "the premise: 80%, {}", g.progress(pro).score());
     pro
 }
@@ -24677,7 +24685,8 @@ fn the_prospectors_open_with_60_materials_where_the_others_hold_80() {
         let s = &g.seats[seat];
         let want = if s.kind == FactionKind::Prospectors { 60.0 } else { 80.0 };
         assert_eq!(s.stockpile.materials, want, "{:?} opens with {} Materials", s.kind, s.stockpile.materials);
-        assert_eq!(s.stockpile.fuel, t.start.fuel as f64, "{:?} Fuel", s.kind);
+        // Ticket #638 (version 0.1.0.6): the Arkwrights' 50 Fuel.
+        assert_eq!(s.stockpile.fuel, if s.kind == FactionKind::Arkwrights { 50.0 } else { t.start.fuel as f64 }, "{:?} Fuel", s.kind);
         assert_eq!(s.stockpile.energy, t.start.energy as f64, "{:?} Energy", s.kind);
         assert_eq!(s.stockpile, t.start_stockpile(s.kind), "{:?} reads start_stockpile", s.kind);
     }
@@ -24687,17 +24696,22 @@ fn the_prospectors_open_with_60_materials_where_the_others_hold_80() {
 }
 
 /// Ticket #585 (version 0.1.0.4), at the designer's word: the Arkwrights and the Archivists open with
-/// 10 Ducats where the table gives none, the card's `start_ducats` read in place of the table's as
+/// 10 Ducats (the Archivists 25 since ticket #638) where the table gives none, the card's `start_ducats` read in place of the table's as
 /// `start_materials` is; the Custodians and the Prospectors open with the table's 0. The signature
 /// texts do not say it: the card's glyph line does. Red with both rows silent: every seat at 0.
 #[test]
-fn the_arkwrights_and_archivists_open_with_10_ducats() {
+fn the_arkwrights_open_with_10_ducats_and_the_archivists_with_25() {
     let g = fresh();
     let t = &g.tables;
     assert_eq!(t.start.ducats, 0);
     for seat in 0..4 {
         let s = &g.seats[seat];
-        let want = if matches!(s.kind, FactionKind::Arkwrights | FactionKind::Archivists) { 10.0 } else { 0.0 };
+        // Ticket #638 (version 0.1.0.6): the Archivists' 25.
+        let want = match s.kind {
+            FactionKind::Arkwrights => 10.0,
+            FactionKind::Archivists => 25.0,
+            _ => 0.0,
+        };
         assert_eq!(s.stockpile.ducats, want, "{:?} opens with {} Ducats", s.kind, s.stockpile.ducats);
         assert_eq!(s.stockpile, t.start_stockpile(s.kind), "{:?} reads start_stockpile", s.kind);
     }
@@ -24892,7 +24906,7 @@ fn the_door_reads_the_parts_without_the_gate() {
     assert_eq!(g.kind(pro), FactionKind::Prospectors);
     bare_stations(&mut g);
     colony(&mut g, pro, BodyId::Mars, &[ModuleKind::Habitat; 4], 20);
-    g.seats[1].venture_fund = 6250.0; // ticket #623: the bar 6,250
+    g.seats[1].venture_fund = 6500.0; // ticket #638: the bar 6,500
     let p = g.progress(pro);
     assert!(!p.gate_open && (p.score_as_it_stands() - 0.94).abs() < 1e-9, "the premise: both bars, no gate, 94%");
     // The Arkwrights near too, so no runaway lead refuses first: only the door can.
@@ -25962,8 +25976,9 @@ fn ticket_620_a_computer_seat_weighs_collapse_against_its_win() {
     assert!(!g.ai_loses_the_race(pro), "no Collapse, no race lost");
     // The win turn: 1,250 of the bar banked by turn 10 is 125 a turn, the rest 40 turns off.
     g.turn = 10;
-    g.seats[pro.index()].venture_fund = 1250.0;
-    assert_eq!(bar, 6250.0, "the premise: the Fund's bar (ticket #623)");
+    // Ticket #638 (version 0.1.0.6): 1,300 of 6,500, 130 a turn, the same forty turns off.
+    g.seats[pro.index()].venture_fund = 1300.0;
+    assert_eq!(bar, 6500.0, "the premise: the Fund's bar (ticket #638)");
     assert_eq!(g.ai_win_turn(pro), Some(50));
     assert!(!g.ai_loses_the_race(pro), "still no Collapse on the heading");
     // The air at a Collapse's worth of CO2: the heading reaches +3.0 within a few turns, well before
@@ -27068,3 +27083,33 @@ fn ticket_631_the_home_end_is_the_seats_and_a_route_at_one_body_refuels() {
     assert!(step.orders.contains(&Order::Refuel { ship: hop }) && step.orders.contains(&Order::ChangeOrbit { ship: hop, slot: Some(0) }), "{:?} {:?}", step.orders, step.wait);
 }
 
+
+/// Ticket #638 (version 0.1.0.6), at the designer's word: the Arkwrights' transit Fuel x0.8, Habitats and
+/// Colony Ships x1.25, no lift population multiplier, station Materials x0.75 and 50 Fuel at the start;
+/// the Archivists 25 Ducats; the Venture Capital Fund's bar 6,500, the computer's pace scaled with it.
+#[test]
+fn ticket_638_the_faction_figures_are_the_designers() {
+    let mut g = game();
+    let seat = |g: &Game, k: FactionKind| Seat::ALL.into_iter().find(|s| g.kind(*s) == k).unwrap();
+    let (ark, arc, cus) = (seat(&g, FactionKind::Arkwrights), seat(&g, FactionKind::Archivists), seat(&g, FactionKind::Custodians));
+    let card = g.tables.faction(FactionKind::Arkwrights).clone();
+    assert_eq!(
+        (card.transit_fuel_multiplier, card.habitat_capacity_multiplier, card.colony_ship_capacity_multiplier, card.lift_population_multiplier, card.station_materials_multiplier),
+        (0.8, 1.25, 1.25, 1.0, 0.75)
+    );
+    assert_eq!(g.seat(ark).stockpile.fuel, 50.0, "the Arkwrights open with 50 Fuel");
+    assert_eq!(g.seat(cus).stockpile.fuel, 20.0, "the others keep the table's 20");
+    assert_eq!(g.seat(arc).stockpile.ducats, 25.0, "the Archivists open with 25 Ducats");
+    assert_eq!(g.colony_ship_capacity(ark), 5, "four, a quarter again");
+    assert!((g.lift_population(ark, 4) - g.lift_population(cus, 4)).abs() < 1e-9, "a Pioneer costs them what it costs anybody");
+    let c = colony(&mut g, ark, BodyId::Moon, &[ModuleKind::Habitat], 0);
+    assert_eq!(g.habitat_room(g.colony(c).unwrap()), 4 + 5, "the Core's four, and a Habitat's four a quarter again");
+    let pro = g.tables.faction(FactionKind::Prospectors).victory_first;
+    assert_eq!(pro.bar, 6500.0);
+    assert_eq!(g.tables.ai_pace(FactionKind::Prospectors).first, vec![[12, 867], [25, 2167], [37, 3900], [47, 6500]], "x6500/6250, the turns as they were");
+    // The card says the new figures.
+    for words in ["5 Colonists, 7 with Expanded Habitats and 10 with Generation Ships", "a quarter again as many, 5 and 10", "four fifths of the Fuel", "33 Materials"] {
+        assert!(card.signature.contains(words), "{words}: {}", card.signature);
+    }
+    assert!(!card.signature.contains("population"), "no Pioneer costs them more: {}", card.signature);
+}

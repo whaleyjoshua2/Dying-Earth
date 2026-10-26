@@ -141,7 +141,8 @@ victory_short = "put {first} Ducats in the Venture Capital Fund with {second} Co
 # Ticket #623 (version 0.1.0.5), at the designer's word: 6,250 ("prospectors fund requires 6250"), with the
 # Prospectors at 36 to 58 wins of 80 through the version's sweeps and the Fund ending a median 5,026 to
 # 5,344, just over the 5,000 bar: the computer banks to its pace.
-victory_first = { kind = "venture_fund", bar = 6250, weight = 0.7 }
+# Ticket #638 (version 0.1.0.6), at the designer's word: 6,500 ("Prospector fund to 6500").
+victory_first = { kind = "venture_fund", bar = 6500, weight = 0.7 }
 victory_second = { kind = "off_world_presence", bar = 20 }
 # Ticket #471 (version 0.09.7): the Opening Objective -- no deadline, met once, rewarded once.
 # Ticket #478 (version 0.09.8): 75 Ducats to 50, and the three Banks must work three Incomes running.
@@ -177,6 +178,8 @@ greenwash_resentment = 0.2
 start_emigrants = 4
 # Ticket #585 (version 0.1.0.4), at the designer's word: 10 Ducats where the table gives none.
 start_ducats = 10
+# Ticket #638 (version 0.1.0.6), at the designer's word: 50 Fuel where the table gives 20.
+start_fuel = 50
 blurb = "Leave Earth: the diaspora is the point."
 motto = "Nothing left behind but the Earth."
 # Ticket #210 (version 0.08.1): the prefix every Ship of theirs wears in front of its name --
@@ -192,16 +195,20 @@ research_per_body_settled = 1
 influence_multiplier = 0.8
 # Ticket #51: Habitats hold half again as many, and a transit burns three quarters of the Fuel
 # (applied before Efficient Transit, multiplicative).
-habitat_capacity_multiplier = 1.5
-transit_fuel_multiplier = 0.75
+# Ticket #638 (version 0.1.0.6), at the designer's word: a quarter again and four fifths ("transit
+# modify for fuel is 0.8 habitat capacity becomes 1.25").
+habitat_capacity_multiplier = 1.25
+transit_fuel_multiplier = 0.8
 # Ticket #51, Coach Class: double loads at double the population cost, and cheap Colony Ships.
 # Ticket #513 (version 0.1.0.0): HALF AGAIN, for half again, at the designer's word ("1.5x the
 # capacity of everyone else"; the other two halves follow, "A"): the Arkwrights won 32 of 80 on
 # the fifty-turn board with the double. Ships carry x1.5 (6, 9, 12 as the Techs come, from 8, 12,
 # 16), each Pioneer costs x1.5 population, and they recruit x1.5 a turn, rounded down (3 a Region,
 # from 4). The Colony Ship's price is untouched.
-colony_ship_capacity_multiplier = 1.5
-lift_population_multiplier = 1.5
+# Ticket #638 (version 0.1.0.6), at the designer's word: Ships a quarter again (5, 7, 10), and the
+# lift population multiplier gone ("drop the lift population modifier all together"): a Pioneer of
+# theirs costs a Region what anybody's does. Their recruiting stays at three a Region.
+colony_ship_capacity_multiplier = 1.25
 # Ticket #73 (version 0.05.5): Coach Class recruits eight Pioneers a turn where everyone else recruits
 # four, at the doubled population above. Ticket #513: three, at the population above.
 emigrants_multiplier = 1.5
@@ -211,14 +218,15 @@ emigrants_multiplier = 1.5
 ship_materials_multiplier = 0.85
 # Ticket #51: they start with no station, so a Space Station costs them half and a Colony Module
 # three quarters (both rounded down).
-station_materials_multiplier = 0.5
+# Ticket #638 (version 0.1.0.6), at the designer's word: three quarters ("station mats at .75").
+station_materials_multiplier = 0.75
 module_materials_multiplier = 0.75
 # Ticket #377 (version 0.09.2): with no station to carry the Solar Array every other seat's
 # station starts with, a second Power Plant in the home Region.
 start_extra_facilities = ["power_plant"]
 # Ticket #407 (version 0.09.4): audited against the data: 16 with Generation Ships too, and a
 # Colony Ship at 25.5 since figures are carried to a tenth.
-signature = "Coach Class. A Colony Ship carries 6 Colonists, 9 with Expanded Habitats and 12 with Generation Ships too, and their Habitats hold half again as many, 6 and 12. They recruit 3 Pioneers a turn in each state where others recruit 2, but every Pioneer takes half again the population. Every Ship costs them 15% less, a Colony Ship 28.1 Materials; a transit burns three quarters of the Fuel; and, starting with no station, a Space Station costs them 22 Materials and a Module three quarters. They draw +{per_body} Research a turn for each Body they have settled."
+signature = "Coach Class. A Colony Ship carries 5 Colonists, 7 with Expanded Habitats and 10 with Generation Ships too, and their Habitats hold a quarter again as many, 5 and 10. They recruit 3 Pioneers a turn in each state where others recruit 2. Every Ship costs them 15% less, a Colony Ship 28.1 Materials; a transit burns four fifths of the Fuel; and, starting with no station, a Space Station costs them 33 Materials and a Module three quarters. They draw +{per_body} Research a turn for each Body they have settled."
 opening_moves = "Build a Space Station over Earth and recruit Pioneers. Put a Shipyard on it, for the Colony Ship that takes them to the Moon."
 # Ticket #419 (version 0.09.4): Unrest off every Region they hold, a whole point for each ground
 # Colony they found off Earth (Antarctica excepted) and half a point for each Space Station they
@@ -266,7 +274,8 @@ start_station = "Axiom"
 # station has two Module slots free from turn one; bare, it had none.
 start_colonists = 2
 # Ticket #585 (version 0.1.0.4), at the designer's word: 10 Ducats where the table gives none.
-start_ducats = 10
+# Ticket #638 (version 0.1.0.6), at the designer's word: 25 ("Start archivists with 25 duckets").
+start_ducats = 25
 # Ticket #210 (version 0.08.1): the prefix every Ship of theirs wears in front of its name --
 # Archive Class Vessel. Chosen at the designer's word, "dealers choice". It belongs to the
 # HOLDER, not the hull: the name is the ship's and travels with it, the prefix is whoever flies it.

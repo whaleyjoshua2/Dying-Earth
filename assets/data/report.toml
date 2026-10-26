@@ -144,7 +144,8 @@ archive_destroyed = "The Archive at {place} was destroyed with its Colony; {fact
 archive_funded = "{faction} are funding the Archive: {banked} Research banked, {fund} of {cap}."
 # Ticket #235 (version 0.08.3): the other three Research Directives. Each says what was given up as
 # well as what was got, because the whole of the decision is the trade.
-exodus_call = "{faction} sounded an Exodus Call in {state}: {n} a turn for {turns}, at the usual cost."
+# Ticket #638 (version 0.1.0.6): Coach Class charges no extra population, so "at the usual cost" went.
+exodus_call = "{faction} sounded an Exodus Call in {state}: {n} a turn for {turns}."
 exodus_call_order = "sounded an Exodus Call in {state}"
 directive_sink = "{faction} directed {research} Research into the Natural Sink: +{ppm} ppm for good, now {sink} a turn."
 directive_ducats = "{faction} directed {research} Research into their coffers: {n} Ducats."

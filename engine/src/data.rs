@@ -839,6 +839,10 @@ pub struct FactionCard {
     /// rows say 10 where the table says 0.
     #[serde(default)]
     pub start_ducats: Option<i64>,
+    /// Ticket #638 (version 0.1.0.6), at the designer's word: the Fuel this Faction opens with, read
+    /// in place of `[start] fuel` where a row carries one; the Arkwrights' says 50.
+    #[serde(default)]
+    pub start_fuel: Option<i64>,
     // Ticket #51: the per-Faction figures the Arkwrights' card carries. Every one is neutral by
     // default, so a card that names none plays exactly as it did before.
     /// What a Habitat here holds, times this.
@@ -2664,6 +2668,9 @@ impl Tables {
             if f.start_materials.is_some_and(|m| m < 0) {
                 return Err(err("factions.toml", format!("row {}: start_materials must not be negative", f.name)));
             }
+            if f.start_fuel.is_some_and(|d| d < 0) {
+                return Err(err("factions.toml", format!("row {}: start_fuel must not be negative", f.name)));
+            }
             if f.start_ducats.is_some_and(|d| d < 0) {
                 return Err(err("factions.toml", format!("row {}: start_ducats must not be negative", f.name)));
             }
@@ -3060,7 +3067,7 @@ impl Tables {
         let f = self.faction(kind);
         crate::state::Stockpile {
             materials: f.start_materials.unwrap_or(self.start.materials) as f64,
-            fuel: self.start.fuel as f64,
+            fuel: f.start_fuel.unwrap_or(self.start.fuel) as f64,
             energy: self.start.energy as f64,
             ducats: f.start_ducats.unwrap_or(self.start.ducats) as f64,
             fissionables: 0.0,

@@ -3553,7 +3553,7 @@ impl Game {
                     }
                     let per = self.emigrants_per_turn_in(seat, *state);
                     let line = format!(
-                        "The {} sounded an Exodus Call in {}: {} Pioneers a turn for {} turns, at the ordinary cost in people.",
+                        "The {} sounded an Exodus Call in {}: {} Pioneers a turn for {} turns.",
                         self.seat_name(seat),
                         self.tables.state(*state).name,
                         per,

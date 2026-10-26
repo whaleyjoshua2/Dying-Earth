@@ -659,8 +659,7 @@ RESEARCH, THE ARCHIVE AND THE FACTION ORDERS
                                        Unrest rise for good
   exodus-call <state>                  the Arkwrights only, on a Region they control, once per Region
                                        EVER, for {exodus} Ducats: while it runs it doubles what they may
-                                       recruit there and suspends Coach Class's double population
-                                       charge.
+                                       recruit there.
 
 A FACTION is named by its own name, shortened as far as it stays unique (`ark` is the Arkwrights),
 or by its seat number. `show` prints both beside every Faction.

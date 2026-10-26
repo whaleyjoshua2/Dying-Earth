@@ -391,7 +391,8 @@ bounty_least = 1.0
 # x 44/42 with the Diaspora, the turns as they were; the Archivists' paces unmoved.
 # Ticket #623 (version 0.1.0.5): the Prospectors' first x 6250/5000 with the bar, the turns as they were.
 [pace.prospectors]
-first = [[12, 834], [25, 2084], [37, 3750], [47, 6250]]
+# Ticket #638 (version 0.1.0.6): x6500/6250 with the bar, rounded, the turns as they were.
+first = [[12, 867], [25, 2167], [37, 3900], [47, 6500]]
 colonists = [[17, 7], [31, 20]]
 
 [pace.custodians]

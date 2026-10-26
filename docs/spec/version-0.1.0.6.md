@@ -13,17 +13,17 @@ pictures and sweeps that decided it are in
 **What the version is.** Version 0.1.0.5 with the designer's list of 2026-10-25. Its spine is a new
 resource, **Fissionables**, found off Earth and richest in the far worlds (§1), which a nuclear hull
 is built and flown with and a Warhead is loaded with (§2), and a new common Reactor burns, the
-Archivists' own building renamed the Accumulator (§3); and the computer is taught to chase them (§4). Beside it, Colony Ships run standing ferry routes (§5).
+Archivists' own building renamed the Accumulator (§3); and the computer is taught to chase them (§4). Beside it, Colony Ships run standing ferry routes (§5), and two Factions' figures and the Prospectors' bar move (§6).
 
 **What it did to the win column** (80 games, per Faction; every section's own sweep is in it):
 
-| | 0.1.0.5 | §1 Fissionables | §2 the nuclear hull | §3 the Reactor | §4 the chase | §5 ferry routes | the ideal |
-|---|---|---|---|---|---|---|---|
-| Custodians | 18 | 23 | 19 | 28 | 22 | 22 | 15 |
-| Prospectors | 61 | 51 | 56 | 47 | 56 | 55 | 15 |
-| Arkwrights | 0 | 3 | 2 | 1 | 1 | 2 | 15 |
-| Archivists | 1 | 1 | 1 | 1 | 1 | 1 | 15 |
-| collapses | 0 | 2 | 2 | 3 | 0 | 0 | 20 |
+| | 0.1.0.5 | §1 Fissionables | §2 the nuclear hull | §3 the Reactor | §4 the chase | §5 ferry routes | §6 the figures | the ideal |
+|---|---|---|---|---|---|---|---|---|
+| Custodians | 18 | 23 | 19 | 28 | 22 | 22 | 30 | 15 |
+| Prospectors | 61 | 51 | 56 | 47 | 56 | 55 | 46 | 15 |
+| Arkwrights | 0 | 3 | 2 | 1 | 1 | 2 | 1 | 15 |
+| Archivists | 1 | 1 | 1 | 1 | 1 | 1 | 3 | 15 |
+| collapses | 0 | 2 | 2 | 3 | 0 | 0 | 0 | 20 |
 
 ## 1. Fissionables, the seventh resource, and Deep Mining and Rich Seam moved
 
@@ -274,3 +274,28 @@ turn after turn (`engine/src/route.rs`).
 **22 / 55 / 2 / 1 and 0 collapses**, from §4's 22 / 56 / 1 / 1 and 0. Over the 80 games, routes set /
 Colonists ferried / deliveries: the Custodians 1 / 6 / 1, the Prospectors 8 / 29 / 5, the Arkwrights
 7 / 12 / 1, the Archivists 18 / 132 / 23. Reported, not tuned.
+
+## 6. The Faction figures: the Arkwrights, the Archivists and the Fund
+
+Ticket: [The Faction figures](https://github.com/whaleyjoshua2/Dying-Earth/issues/638).
+
+| | was | now |
+|---|---|---|
+| Arkwrights' transit Fuel | x0.75 | **x0.8** |
+| Arkwrights' Habitat capacity | x1.5 | **x1.25** (5, 10 with Expanded Habitats) |
+| Arkwrights' Colony Ship capacity | x1.5 | **x1.25** (5, 7 with Expanded Habitats, 10 with Generation Ships too) |
+| Arkwrights' lift population | x1.5 | **gone**: a Pioneer of theirs costs the ordinary population |
+| Arkwrights' station Materials | x0.5 | **x0.75** (33 Materials) |
+| Arkwrights' opening Fuel | 20 | **50** (`start_fuel`, a new per-Faction figure) |
+| Archivists' opening Ducats | 10 | **25** |
+| Prospectors' Fund bar | 6,250 | **6,500**, the computer's pace x6500/6250: 867 / 2,167 / 3,900 / 6,500 at turns 12 / 25 / 37 / 47 |
+
+Q1: the designer's second line names the Archivists but its figures are all the Arkwrights', and are
+read as theirs. Q2: the 50 Fuel is theirs too. Their recruiting, three a Region, is unchanged.
+
+**Consequences, not decisions.** The Exodus Call suspended Coach Class's extra population charge; with
+the charge gone it suspends nothing, and its hover no longer says it does. The Arkwrights' card shows
+the 50 Fuel in its opening goods line and no longer lists a lift population multiplier.
+
+**Measured** ([`sweeps/ticket-638.txt`](../dev-diary/2026-10-25-version-0.1.0.6/sweeps/ticket-638.txt)):
+**30 / 46 / 1 / 3 and 0 collapses**, from §5's 22 / 55 / 2 / 1 and 0. Reported, not tuned.

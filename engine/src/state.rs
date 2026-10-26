@@ -2630,7 +2630,8 @@ impl Game {
     }
 
     /// Ticket #237: the population a muster takes HERE. A Call suspends Coach Class's double
-    /// charge for as long as it runs, which is the whole point of it.
+    /// charge for as long as it runs, which is the whole point of it. Ticket #638 (version 0.1.0.6):
+    /// Coach Class charges no extra population now, so the suspension changes nothing.
     ///
     /// Measured before it was decided: the Arkwrights' home state runs 20 units to 1 over a game
     /// as it is, because Coach Class charges them twice a head, so an order that only doubled the
@@ -2646,7 +2647,7 @@ impl Game {
     }
 
     /// What one Colony Ship of this seat carries: the card figure, +2 with Expanded Habitats
-    /// (version 0.04 section 4), times the Faction's own multiplier (Coach Class's 1.5 since ticket #513, 2.0 before).
+    /// (version 0.04 section 4), times the Faction's own multiplier (Coach Class's 1.25 since ticket #638, 1.5 from ticket #513, 2.0 before).
     pub fn colony_ship_capacity(&self, seat: Seat) -> u32 {
         // Ticket #84: Generation Ships stacks on Expanded Habitats.
         let base = self.tables.unit(UnitKind::ColonyShip).carries_colonists as i64 + self.tech_addition(seat, TechId::ExpandedHabitats) + self.tech_addition(seat, TechId::GenerationShips);
@@ -2933,7 +2934,7 @@ impl Game {
         }
     }
 
-    /// The population a lift from a Launch Site takes for this many Colonists (Coach Class's 1.5 since ticket #513, 2.0 before).
+    /// The population a lift from a Launch Site takes for this many Colonists (Coach Class's 1.5 from ticket #513, 2.0 before, and none since ticket #638).
     pub fn lift_population(&self, seat: Seat, colonists: u32) -> f64 {
         // Ticket #73: paid when the Emigrants muster, not when a Ship lifts them.
         self.tables.emigrants.population_each * colonists as f64 * self.tables.faction(self.kind(seat)).lift_population_multiplier

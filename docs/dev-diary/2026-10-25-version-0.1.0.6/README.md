@@ -258,3 +258,42 @@ from 22 / 56 / 1 / 1 and 0. By Faction, over the 80 games:
 
 The six goods are each Faction's income a game, net of upkeep. The Archivists run the most routes;
 34 routes in 80 games is few, and why was not measured. Reported, not tuned.
+
+## The Faction figures
+
+Ticket [#638](https://github.com/whaleyjoshua2/Dying-Earth/issues/638), spec §6. Decided in one round: the
+designer's *"Archivists start with 50 fuel and their transit modify for fuel is 0.8 ..."* is the
+Arkwrights' line, the 50 Fuel with it; the Archivists open with 25 Ducats; the Fund is 6,500.
+
+**Built test first**: one test pinning every new figure and the card's words, red on the old data.
+Twenty-three older tests pinned the old figures and were moved to the new, each with its ticket; four
+were renamed, since their names stated the old rule (*an Arkwright habitat holds twelve*). One fixture
+needed more than a figure: the Arkwrights' station of five Habitats held 34 at half again and holds 29
+at a quarter again, under the 32 its premise puts aboard, so it has six.
+
+I quoted the designer 870 / 2,168 for the pace; x6500/6250 rounded as ticket #623 rounded is 867 /
+2,167, which is what stands. My first card text said a Colony Ship carries 10 and 15 with the Techs;
+the Techs add two each to a Colony Ship, so it is 7 and 10. The new test carried the same mistake;
+it was caught while moving the older Colony Ship test, whose arithmetic reads 7.
+
+![The openings: the Arkwrights' 52.4 Fuel, the Archivists' 34.6 Ducats](ticket-638/opening-bars.png)
+![The Arkwrights' board: a station over Earth at 33 Materials](ticket-638/arkwrights-earth.png)
+![The picker: the Prospectors' 6,500](ticket-638/picker.png)
+
+**The sweep** ([`sweeps/ticket-638.txt`](sweeps/ticket-638.txt)): **30 / 46 / 1 / 3 and 0 collapses**,
+from 22 / 55 / 2 / 1 and 0. Each Faction's income a game, net of upkeep:
+
+| | Materials | Fuel | Energy | Ducats | Research | Fissionables |
+|---|---|---|---|---|---|---|
+| Custodians | 2,360 | 682 | 1,045 | 1,066 | 1,193 | 73.6 |
+| Prospectors | 1,841 | 455 | 636 | 1,579 | 270 | 62.2 |
+| Arkwrights | 674 | 110 | 221 | 2,677 | 266 | 0.8 |
+| Archivists | 438 | 258 | 25 | 592 | 717 | 2.4 |
+
+**The review** found no figure or sum wrong. It found words: the Exodus Call still said it ran *at the
+ordinary cost in people* in the order list, the Report, the log and the text tool's help, a saving that
+no longer exists, and is cut; the glossary's opening figures and Habitat entry, two doc comments and
+three test names still told the old figures, and are moved.
+
+The Prospectors fell nine and the Custodians took them; the Arkwrights lost the one they had gained.
+Reported, not tuned.
