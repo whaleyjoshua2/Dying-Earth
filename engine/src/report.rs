@@ -841,6 +841,7 @@ pub const RIVAL_ARGS: &[(&str, &[&str])] = &[
     ("route_on", &["ship", "colony"]),
     ("route_off", &["ship"]),
     ("scrap", &["ship", "colony"]),
+    ("refit", &["ship"]),
     ("build_emigrants", &["n", "state"]),
     ("send_antarctica", &["n", "state"]),
     ("lift_station", &["n", "state", "station"]),

@@ -483,3 +483,29 @@ an empty Colony Ship about to be destroyed can become a Habitat instead.
 
 **The sweep** ([`sweeps/ticket-637.txt`](sweeps/ticket-637.txt)): **32 / 45 / 1 / 2 and 0 collapses**,
 from 29 / 48 / 1 / 2; 153 Colony Ships scrapped, and the Ships stranded at the end fell from 244 to 109.
+
+## Refitting a chemical hull as a nuclear one
+
+Ticket [#644](https://github.com/whaleyjoshua2/Dying-Earth/issues/644), spec §13, a ticket the designer
+added to this version mid-way. Decided in one round. One fact moved the draft: a Rearm does not hold
+its carrier, so a refit holding its hull in orbit would have been a new rule; the designer took the
+Rearm's (Q4 a).
+
+**Built** as a build item in the yard's queue beside the Warhead, landing on the hull wherever it is.
+The computer's refit is a pass after its chosen orders, so a hull refits only when nothing else
+wanted it -- or so the comment said. Eight rules broken on purpose, each red. The picture's first
+take showed the build template's *0 Materials* first line; it now names the Fissionables.
+
+**The review** found the computer's refit placed BEFORE its candidates, not after: it took the
+hull's one action, so a Frigate the planner wanted at Mars stayed home refitting, and it spent
+Fissionables a nuclear build wanted. Moved after both candidate loops, and kept off a hull on a ferry
+route or given a load, a refuel or a route; refits over the batch fell from 116 to 33. Mended besides:
+a Scrap on a hull with its refit queued threw the Fissionables away (refused now); the second tank was
+not capped at the tank when the refit landed; the card dropped *refit under way* while the hull flew.
+Three more rules broken on purpose, each red.
+
+![A chemical Frigate over a Moon Colony with a Shipyard: Refit nuclear, 3 Fissionables, 2 Widgets](ticket-644/card-moon.png)
+
+**The sweep** ([`sweeps/ticket-644.txt`](sweeps/ticket-644.txt)), after the review's mends: **32 / 45 / 1 /
+2 and 0 collapses**, the same wins as #637's; 33 hulls refitted, nearly all the Prospectors' and
+Custodians'.

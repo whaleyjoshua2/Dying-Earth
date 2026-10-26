@@ -722,6 +722,22 @@ fn build_board(session: &mut Session) {
             }
             g.seats[0].stockpile.fuel = 100.0;
         }
+        // `refit:1` (a building aid, ticket #644, version 0.1.0.6): Nuclear Rockets stands, seat 0
+        // holds Fissionables, and a chemical Frigate of seat 0's sits in the Moon's low orbit over a
+        // Colony of seat 0's with a Shipyard, so its card (`stack:moon ship:1`) carries Refit nuclear.
+        if std::env::args().any(|a| a == "refit:1") {
+            let body = BodyId::Moon;
+            let slot = g.free_slots_on(body)[0];
+            let cid = ColonyId(g.fresh_id());
+            let modules = [ModuleKind::Core, ModuleKind::Shipyard].map(Module::new).to_vec();
+            g.colonies.push(Colony { id: cid, body, slot, control: Control::Controlled(Seat(0)), modules, colonists: 4, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: g.turn, tier: 0, in_orbit: false });
+            g.research.done.push(TechId::NuclearRockets);
+            g.seats[0].stockpile.fissionables = 20.0;
+            let id = ShipId(g.fresh_id());
+            let name = g.next_ship_name(UnitKind::Frigate);
+            let fuel = g.tank_of(Seat(0), UnitKind::Frigate);
+            g.ships.push(Ship { nuclear: false, fissionables: 0.0, id, name, kind: UnitKind::Frigate, seat: Seat(0), damage: 0, at: ShipAt::Body(body), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: g.turn, fuel, slot: None });
+        }
         // `scrap:1` (a building aid, ticket #637, version 0.1.0.6): the playtest's case -- an empty
         // Colony Ship of seat 0's stranded in Mercury's low orbit with 0.6 Fuel, over a Colony of seat
         // 0's -- so its card (`stack:mercury ship:1`) carries the Scrap button.

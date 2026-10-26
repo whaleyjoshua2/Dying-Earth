@@ -4528,6 +4528,26 @@ impl Game {
                 stacks_done.push(key);
             }
         }
+        // Ticket #644 (version 0.1.0.6), at the designer's word (Q6): a chemical hull standing at a
+        // yard of its own, with no order this turn, is refitted nuclear where the seat could build
+        // nuclear -- the second tank's fill and `nuclear_hull_reserve_tanks` more in Fissionables,
+        // read after the turn's other spending. From the review: after the candidates, so a move
+        // the planner wanted goes first; and never a hull on a ferry route or given a load, a
+        // refuel or a route this turn.
+        let hulls: Vec<ShipId> = self.ships.iter().filter(|s| s.seat == seat && !s.nuclear && !s.escaped && UnitKind::SHIPS.contains(&s.kind) && !self.routes.iter().any(|r| r.ship == s.id)).map(|s| s.id).collect();
+        for ship in hulls {
+            let Some(kind) = self.ship(ship).map(|s| s.kind) else { continue };
+            if chosen.iter().any(|o| crate::orders::is_load(o, ship) || matches!(o, Order::Refuel { ship: x } | Order::SetRoute { ship: x, .. } if *x == ship)) {
+                continue;
+            }
+            let fill = self.fission_tank_of(seat, kind);
+            let left = self.seat(seat).stockpile.fissionables - chosen.iter().map(|o| self.order_cost(seat, o).fissionables).sum::<f64>();
+            let refit = Order::Refit { ship };
+            if self.has_tech(TechId::NuclearRockets) && fill > 0.0 && left + 1e-9 >= fill * (1.0 + self.tables.ai.thresholds.nuclear_hull_reserve_tanks) && self.check_order(seat, &chosen, &refit).is_ok() {
+                lines.push(format!("  take          refit {} nuclear", self.ship(ship).map(|s| self.ship_name(s)).unwrap_or_default()));
+                chosen.push(refit);
+            }
+        }
         // Ticket #268 (version 0.08.4): the computer Custodians' carbon-credit offer, a standing
         // figure re-set whenever it should move. They offer their whole credit while their own share
         // of the table's Blame is under the fair quarter, and withdraw the offer when it is not --

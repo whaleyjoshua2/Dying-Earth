@@ -834,6 +834,8 @@ fn main() {
                             println!("      Ferry routes set / Colonists ferried / deliveries over the batch, by seat {:?} / {:?} / {:?}", warc.routes_set, warc.ferried, warc.ferry_trips);
                             // Ticket #637 (version 0.1.0.6): empty Colony Ships scrapped into Habitats.
                             println!("      Colony Ships scrapped into Habitats over the batch, by seat {:?}", warc.scrapped);
+                            // Ticket #644 (version 0.1.0.6): chemical hulls refitted nuclear.
+                            println!("      Hulls refitted nuclear over the batch, by seat {:?}", warc.refits);
                             // Ticket #633 (version 0.1.0.6).
                             println!("      Games with the first child born off Earth, by seat {:?}", warc.first_born);
                             // Ticket #632 (version 0.1.0.6).

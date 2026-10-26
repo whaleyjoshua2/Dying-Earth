@@ -21109,7 +21109,8 @@ fn the_reports_templates_stay_under_their_word_ceiling() {
     // Ticket #632 (version 0.1.0.6): and by the 28 of refugees sent to the stars, and the lack.
     // Ticket #636 (version 0.1.0.6): and by the 6 of an inherited Army waiting on Hold.
     // Ticket #637 (version 0.1.0.6): and by the 7 of a Colony Ship scrapped.
-    assert!(words <= 2083, "the Report's templates hold {words} words; the ceiling is 2,083 (7 for a scrapped hull, 6 for an Army waiting on Hold, 28 for refugees sent to the stars, 18 for the first child born off Earth, 39 for a ferry route, 9 for Fissionables run short, 10 for a Strip Permit's clauses, 9 for an Occupation's holder, 15 for a rival on yours, 33 for a window and the head, 46 for an Accord's end, 9 for a place handed over twice, 9 for an Army inherited, 12 for an Accord broken, 15% off 2,031, 54 for the race to the Moon, 2 for a rival's upgrade, 8 for an Accord answered, less a word of slack, 17 for a Trade, 9 for a Capital refunded, 5 for an Accord let lapse, 7 for Terms added, 5 for a renewal)");
+    // Ticket #644 (version 0.1.0.6): and by the 4 of a refit begun.
+    assert!(words <= 2087, "the Report's templates hold {words} words; the ceiling is 2,087 (4 for a refit, 7 for a scrapped hull, 6 for an Army waiting on Hold, 28 for refugees sent to the stars, 18 for the first child born off Earth, 39 for a ferry route, 9 for Fissionables run short, 10 for a Strip Permit's clauses, 9 for an Occupation's holder, 15 for a rival on yours, 33 for a window and the head, 46 for an Accord's end, 9 for a place handed over twice, 9 for an Army inherited, 12 for an Accord broken, 15% off 2,031, 54 for the race to the Moon, 2 for a rival's upgrade, 8 for an Accord answered, less a word of slack, 17 for a Trade, 9 for a Capital refunded, 5 for an Accord let lapse, 7 for Terms added, 5 for a renewal)");
     // "The" is gone before a Faction's name, which is drawn in its colour instead.
     assert!(!text.contains("he {faction}"), "a template still says \"the {{faction}}\"");
 }
@@ -27734,4 +27735,125 @@ fn ticket_637_the_reviews_cases() {
     g.stranded_since.push((full, 0));
     g.turn += 5;
     assert!(!g.clone().ai_orders(seat).iter().any(|o| matches!(o, Order::Scrap { ship: s, colony: x } if *s == full && *x == c)), "people aboard: no scrap");
+}
+
+// ---------------------------------------------------------------- 0.1.0.6 ticket #644: refitting a chemical hull nuclear
+
+/// A chemical Frigate of seat 0's in the Moon's low orbit over a Colony of seat 0's with a Shipyard,
+/// Nuclear Rockets standing and Fissionables to spare.
+fn refit_yard(g: &mut Game) -> (ColonyId, ShipId) {
+    let yard = colony(g, Seat(0), BodyId::Moon, &[ModuleKind::Shipyard], 3);
+    let ship = ship_in(g, Seat(0), UnitKind::Frigate, BodyId::Moon, None, Stance::Hold);
+    with_tech(g, TechId::NuclearRockets);
+    g.seats[0].stockpile.fissionables = 100.0;
+    (yard, ship)
+}
+
+/// Ticket #644 (version 0.1.0.6), at the designer's word: a chemical hull is refitted nuclear at a
+/// yard of its seat's in the orbit that touches it (Q1), once Nuclear Rockets stands (Q2), for the
+/// second tank's fill of Fissionables and a quarter of the hull's Widgets, rounded up (Q3). The work
+/// is queued as a Rearm is and lands on the hull wherever it is (Q4): nuclear, its second tank full.
+#[test]
+fn ticket_644_a_chemical_hull_is_refitted_nuclear() {
+    let mut g = game();
+    let (yard, ship) = refit_yard(&mut g);
+    let fill = g.fission_tank_of(Seat(0), UnitKind::Frigate);
+    let refit = Order::Refit { ship };
+    let cost = g.check_order(Seat(0), &[], &refit).expect("a refit");
+    assert_eq!((cost.materials, cost.fissionables), (0.0, fill), "the second tank's fill, no Materials");
+    let held = g.seats[0].stockpile.fissionables;
+    g.commit_orders(Seat(0), &[refit]);
+    assert_eq!(g.seats[0].stockpile.fissionables, tenth(held - fill));
+    let b = g.colony(yard).unwrap().queue.iter().find(|b| b.item == BuildItem::Refit(ship)).expect("queued at the yard").clone();
+    assert_eq!(b.widgets, g.tables.unit(UnitKind::Frigate).widgets.div_ceil(4), "a quarter of the hull's Widgets, rounded up");
+    // Q4: the Ship is free meanwhile; the refit lands on it wherever it is.
+    g.ship_mut(ship).unwrap().at = ShipAt::Body(BodyId::Mars);
+    for _ in 0..10 {
+        if g.ship(ship).unwrap().nuclear {
+            break;
+        }
+        g.resolution_phase();
+        g.turn += 1;
+    }
+    let s = g.ship(ship).unwrap();
+    assert!(s.nuclear, "refitted");
+    assert_eq!(s.fissionables, fill, "its second tank full");
+}
+
+/// Ticket #644: refused before Nuclear Rockets, on a nuclear hull (Q5: one way), away from a yard of
+/// its own, in transit, twice, and beside another order on the hull.
+#[test]
+fn ticket_644_a_refit_is_refused_where_it_does_not_apply() {
+    let mut g = game();
+    let (yard, ship) = refit_yard(&mut g);
+    let refit = Order::Refit { ship };
+    let err = |g: &Game, pending: &[Order]| g.check_order(Seat(0), pending, &Order::Refit { ship }).unwrap_err().0;
+    g.research.done.retain(|t| *t != TechId::NuclearRockets);
+    assert!(err(&g, &[]).contains("Nuclear Rockets"));
+    with_tech(&mut g, TechId::NuclearRockets);
+    g.ship_mut(ship).unwrap().nuclear = true;
+    assert!(err(&g, &[]).contains("already nuclear"));
+    g.ship_mut(ship).unwrap().nuclear = false;
+    g.colony_mut(yard).unwrap().modules.retain(|m| m.kind != ModuleKind::Shipyard);
+    assert!(err(&g, &[]).contains("Shipyard"));
+    g.colony_mut(yard).unwrap().modules.push(Module::new(ModuleKind::Shipyard));
+    g.ship_mut(ship).unwrap().slot = Some(0);
+    assert!(err(&g, &[]).contains("no place of yours"));
+    g.ship_mut(ship).unwrap().slot = None;
+    assert!(err(&g, std::slice::from_ref(&refit)).contains("already has an order"));
+    assert!(err(&g, &[Order::Transit { ship, to: BodyId::Mars, slot: None }]).contains("already has an order"));
+    g.commit_orders(Seat(0), std::slice::from_ref(&refit));
+    assert!(err(&g, &[]).contains("under way"), "queued already");
+    g.colony_mut(yard).unwrap().queue.clear();
+    g.ship_mut(ship).unwrap().at = ShipAt::Transit { from: BodyId::Earth, to: BodyId::Moon, turns_left: 2 };
+    assert!(err(&g, &[]).contains("in transit"));
+}
+
+/// Ticket #644 (Q6): a computer seat refits a chemical hull standing at its own yard when it can
+/// build nuclear (the second tank's fill and two tanks more in Fissionables).
+#[test]
+fn ticket_644_the_computer_refits_when_it_can_keep_the_tank_filled() {
+    let mut g = game();
+    let seat = Seat(1);
+    colony(&mut g, seat, BodyId::Moon, &[ModuleKind::Shipyard], 3);
+    let ship = ship_in(&mut g, seat, UnitKind::Frigate, BodyId::Moon, None, Stance::Hold);
+    with_tech(&mut g, TechId::NuclearRockets);
+    let fill = g.fission_tank_of(seat, UnitKind::Frigate);
+    let refits = |g: &Game| g.clone().ai_orders(seat).iter().any(|o| matches!(o, Order::Refit { ship: s } if *s == ship));
+    g.seats[seat.index()].stockpile.fissionables = tenth(fill * 3.0 - 0.1);
+    assert!(!refits(&g), "short of the reserve");
+    g.seats[seat.index()].stockpile.fissionables = 100.0;
+    // From the review: a move the planner wants goes first; the refit waits for a turn with none.
+    let flies = g.clone().ai_orders(seat).iter().any(|o| matches!(o, Order::Transit { ship: s, .. } if *s == ship));
+    assert!(flies && !refits(&g), "with a full tank it flies, and is not refitted");
+    g.ship_mut(ship).unwrap().fuel = 0.0;
+    assert!(refits(&g), "grounded, with the reserve: refitted");
+}
+
+/// Ticket #644, from the review: a hull whose refit is queued is not scrapped, which would throw its
+/// Fissionables away; and the refit fills the second tank to the tank and no further.
+#[test]
+fn ticket_644_a_queued_refit_blocks_a_scrap_and_fills_only_to_the_tank() {
+    let mut g = game();
+    let yard = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Shipyard], 3);
+    let ship = ship_in(&mut g, Seat(0), UnitKind::ColonyShip, BodyId::Moon, None, Stance::Hold);
+    g.ship_mut(ship).unwrap().colonists = 0;
+    with_tech(&mut g, TechId::NuclearRockets);
+    g.seats[0].stockpile.fissionables = 100.0;
+    let tank = g.fission_tank_of(Seat(0), UnitKind::ColonyShip);
+    // Fissionables already aboard, from a market's odd delivery: the refit tops up, not over.
+    g.ship_mut(ship).unwrap().fissionables = tank;
+    g.commit_orders(Seat(0), &[Order::Refit { ship }]);
+    g.turn += 1;
+    assert!(g.check_order(Seat(0), &[], &Order::Scrap { ship, colony: yard }).unwrap_err().0.contains("refit is under way"));
+    for _ in 0..10 {
+        if g.ship(ship).unwrap().nuclear {
+            break;
+        }
+        g.resolution_phase();
+        g.turn += 1;
+    }
+    let s = g.ship(ship).unwrap();
+    assert!(s.nuclear);
+    assert_eq!(s.fissionables, tank, "to the tank and no further");
 }

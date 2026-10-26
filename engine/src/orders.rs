@@ -256,6 +256,9 @@ pub enum Order {
     /// Ticket #637 (version 0.1.0.6), at the designer's word: an empty Colony Ship in the orbit that
     /// touches a Colony of its seat's is broken up into a free Habitat there; its tank is lost.
     Scrap { ship: ShipId, colony: ColonyId },
+    /// Ticket #644 (version 0.1.0.6), at the designer's word: a chemical hull refitted nuclear at a
+    /// yard of its seat's in its own orbit, once Nuclear Rockets stands. One way.
+    Refit { ship: ShipId },
 }
 
 impl Order {
@@ -375,7 +378,8 @@ pub fn is_load(o: &Order, ship: ShipId) -> bool {
 }
 
 /// Ticket #533: a Ship's **one action** a turn, which a load and a refuel stand beside: a flight, a
-/// change of orbit, an unload or a founding, a Bombard, a Launch or a Rearm. Ticket #568 (version
+/// change of orbit, an unload or a founding, a Bombard, a Launch, a Rearm, and since version 0.1.0.6
+/// a Refit or a Scrap. Ticket #568 (version
 /// 0.1.0.3): a load off a Colony or station was the action until then; it is free now, as a lift.
 pub fn is_ship_action(o: &Order, ship: ShipId) -> bool {
     match o {
@@ -385,6 +389,7 @@ pub fn is_ship_action(o: &Order, ship: ShipId) -> bool {
         | Order::Bombard { ship: x, .. }
         | Order::Launch { ship: x, .. }
         | Order::Rearm { ship: x }
+        | Order::Refit { ship: x }
         | Order::Scrap { ship: x, .. } => *x == ship,
         _ => false,
     }
@@ -520,6 +525,7 @@ impl Game {
             Order::BuildShip { kind, .. } => Some(BuildItem::Unit(*kind)),
             Order::BuildArmy { .. } => Some(BuildItem::Unit(UnitKind::Army)),
             Order::Rearm { ship } => Some(BuildItem::Warhead(*ship)),
+            Order::Refit { ship } => Some(BuildItem::Refit(*ship)),
             _ => None,
         };
         // A Launch spends the Warhead and no Fuel.
@@ -700,6 +706,8 @@ impl Game {
             Order::Launch { .. } => Cost::default(),
             // Ticket #629 (version 0.1.0.6): and the Warhead's half a Fissionable.
             Order::Rearm { .. } => Cost { materials: t.nuke.rearm_materials as f64, fissionables: t.nuke.fissionables, ..Default::default() },
+            // Ticket #644 (version 0.1.0.6), Q3: the second tank's fill, as a nuclear build pays.
+            Order::Refit { ship } => Cost { fissionables: self.ship(*ship).map_or(0.0, |s| self.fission_tank_of(seat, s.kind)), ..Default::default() },
             // Ticket #404 (version 0.09.4): a tribute is paid from the Stockpile with the order's
             // cost, so the confirm names it and the running total counts it; it was taken at the
             // commit, outside the cost, and the driver said `costs free`.
@@ -1349,6 +1357,11 @@ impl Game {
                 // removal would leave paid for and dangling.
                 if pending.iter().any(|o| is_ship_action(o, *ship) || is_load(o, *ship) || matches!(o, Order::Refuel { ship: x } | Order::SetRoute { ship: x, .. } if x == ship)) {
                     return fail("this Ship already has an order");
+                }
+                // Ticket #644 (version 0.1.0.6), from the review: not a hull whose refit is queued,
+                // whose Fissionables the scrap would throw away.
+                if self.colonies.iter().any(|c| c.queue.iter().any(|b| b.item == BuildItem::Refit(*ship))) {
+                    return fail("its refit is under way");
                 }
                 // The Habitat's own rules: a slot free, among them.
                 self.check_order_rules(seat, pending, &Order::BuildModule { colony: *colony, kind: ModuleKind::Habitat })?;
@@ -2305,6 +2318,34 @@ impl Game {
                 }
                 Ok(cost)
             }
+            Order::Refit { ship } => {
+                let Some(s) = self.ship(*ship) else { return fail("no such Ship") };
+                if s.seat != seat {
+                    return fail("not your Ship");
+                }
+                if !self.has_tech(TechId::NuclearRockets) {
+                    return fail(format!("a refit needs {} first", self.tables.tech(TechId::NuclearRockets).name));
+                }
+                // Q5: one way.
+                if s.nuclear {
+                    return fail("already nuclear");
+                }
+                if !matches!(s.at, ShipAt::Body(_)) {
+                    return fail("in transit");
+                }
+                match self.rearm_site(seat, *ship) {
+                    RearmSite::Yard(_) => {}
+                    RearmSite::NoPlace => return fail("no place of yours in this orbit to refit at"),
+                    RearmSite::NoShipyard => return fail("no working Shipyard here"),
+                }
+                if pending.iter().any(|o| is_ship_action(o, *ship)) {
+                    return fail("this Ship already has an order");
+                }
+                if self.colonies.iter().any(|c| c.queue.iter().any(|b| b.item == BuildItem::Refit(*ship))) {
+                    return fail("its refit is under way");
+                }
+                Ok(cost)
+            }
             Order::ShipStance { body, stance } => {
                 if self.ships_at(seat, *body).is_empty() {
                     return fail("no Ships of yours there");
@@ -3206,6 +3247,14 @@ impl Game {
                 Order::Launch { ship, target } => self.pending.launches.push((seat, *ship, *target)),
                 // Ticket #343: the Warhead is a build in the yard's queue, so it takes the yard's
                 // Widgets in queue order like anything else and lands at the Resolution they reach it.
+                Order::Refit { ship } => {
+                    if let RearmSite::Yard(c) = self.rearm_site(seat, *ship) {
+                        let widgets = self.build_widgets(seat, BuildItem::Refit(*ship));
+                        if let Some(col) = self.colony_mut(c) {
+                            col.queue.push(Build { item: BuildItem::Refit(*ship), seat, widgets, done: 0, coastal: false, fuel: 0.0, nuclear: false, fissionables: cost.fissionables });
+                        }
+                    }
+                }
                 Order::Rearm { ship } => {
                     if let RearmSite::Yard(c) = self.rearm_site(seat, *ship) {
                         let widgets = self.build_widgets(seat, BuildItem::Warhead(*ship));
@@ -3965,6 +4014,7 @@ impl Game {
             // Ticket #343 (version 0.09.1).
             Order::Launch { target, .. } => r("launch", &[("place", place(*target))]),
             Order::Rearm { .. } => r("rearm", &[]),
+            Order::Refit { ship } => r("refit", &[("ship", self.ship(*ship).map(|s| self.ship_name(s)).unwrap_or_else(|| "a hull".into()))]),
             Order::ShipStance { body, stance } => {
                 r("ship_stance", &[("body", self.tables.body(*body).name.clone()), ("stance", stance.name().to_string())])
             }

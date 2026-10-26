@@ -291,6 +291,10 @@ pub enum BuildItem {
     /// flagged `replacing` becomes this kind (the Wind Farm) at the Resolution it completes. Half the
     /// kind's Widgets; it takes no slot of its own, the Power Plant's being the one it stands in.
     Replace(FacilityKind),
+    /// Ticket #644 (version 0.1.0.6), at the designer's word: a chemical hull **refitted** as a
+    /// nuclear one at a yard of its Faction's, queued as a Warhead is; it lands on the hull wherever
+    /// it is, its second tank filled with the Fissionables paid at the order.
+    Refit(ShipId),
 }
 
 impl BuildItem {
@@ -303,6 +307,7 @@ impl BuildItem {
             BuildItem::Module(k) => k.name().to_string(),
             BuildItem::Unit(k) => k.name().to_string(),
             BuildItem::Warhead(_) => "Warhead".to_string(),
+            BuildItem::Refit(_) => "Nuclear refit".to_string(),
         }
     }
 }
@@ -1379,6 +1384,9 @@ pub struct WarCounters {
     /// Ticket #637 (version 0.1.0.6): Colony Ships scrapped into Habitats, by seat.
     #[serde(default)]
     pub scrapped: [u32; SEAT_COUNT],
+    /// Ticket #644 (version 0.1.0.6): chemical hulls refitted nuclear, by seat.
+    #[serde(default)]
+    pub refits: [u32; SEAT_COUNT],
     /// Ticket #633 (version 0.1.0.6): games in which the seat had the first child born off Earth.
     #[serde(default)]
     pub first_born: [u32; SEAT_COUNT],
@@ -1504,6 +1512,7 @@ impl WarCounters {
             self.ferried[i] += o.ferried[i];
             self.ferry_trips[i] += o.ferry_trips[i];
             self.scrapped[i] += o.scrapped[i];
+            self.refits[i] += o.refits[i];
             self.first_born[i] += o.first_born[i];
             self.stars_sent[i] += o.stars_sent[i];
             self.stars_lost[i] += o.stars_lost[i];

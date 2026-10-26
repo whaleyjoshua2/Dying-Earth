@@ -215,6 +215,10 @@ _Avoid_: Reactor (since version 0.1.0.6, the common power station), battery (tha
 A Ship built, since version 0.1.0.6, once Nuclear Rockets stands, beside the **chemical hull** the yard has always built: it alone takes the Tech's shorter crossing. It carries a second tank, of Fissionables, a tenth of its Fuel tank -- so the Fuel tank's Techs grow it too -- filled at the build for Fissionables paid at the order, as the Fuel tank is, and refilled by the same Refuel; every leg it flies burns a tenth of its Fuel in Fissionables beside the Fuel, crossings and changes of orbit alike, never a Battle's charge. Short of either, it does not fly the leg.
 _Avoid_: nuclear ship, NTR, fast hull
 
+**Refit**:
+Since version 0.1.0.6, a chemical hull made a **Nuclear hull**, once Nuclear Rockets stands, at a Colony or station of its Faction's with a working Shipyard in the orbit that touches it: a build in that yard's queue, as a **Rearm** is, paid with the second tank's fill of Fissionables at the order and a quarter of the hull's Widgets. The hull is free meanwhile, and the refit lands on it wherever it is. One way.
+_Avoid_: upgrade, conversion, retrofit
+
 **Nuclear Rockets**:
 The Tech, since version 0.09.3, that shortens a Transit: Propulsion, rung 3 at 48 Research since version 0.1.0.0, needing Cryogenic Tanks (rung 2 at 38 before, needing Clean Propellant). It cuts a crossing's days by a fifth before the days are rounded up to turns, so a Mars crossing at the Launch Window takes four turns where it took five -- since version 0.1.0.6 for a **nuclear hull** alone, the one it opens at the yard, a chemical hull flying at the old speed; a one-turn hop inside a system stays one; the Fuel of a leg is untouched, and a flight already under way keeps its turns. Missile Technology needs it and Hardened Hulls both, since version 0.1.0.0.
 _Avoid_: nuclear drive, NTR, fast transit, engines

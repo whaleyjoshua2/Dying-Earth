@@ -5769,6 +5769,7 @@ fn order_text(game: &Game, earlier: &[Order], o: &Order) -> String {
         // name them. The buttons that give them are the interface lane's work.
         Order::Launch { ship, target } => format!("Launch a Warhead at {} from {}", game.place_name(*target), game.ship_called(*ship)),
         Order::Rearm { ship } => format!("Rearm {}", game.ship_called(*ship)),
+        Order::Refit { ship } => format!("Refit {} nuclear", game.ship_called(*ship)),
         Order::ArmyStance { place, stance } => format!("Armies at {}: {}", game.place_name(*place), stance.name()),
         Order::MoveArmy { army, to } => format!("{} to {}", game.army_called(*army), game.tables.state(*to).name),
         Order::Load { ship, colonists, army, .. } => format!("Load {} onto {}", if *colonists > 0 { counted(colonists, "Colonist", "Colonists") } else { army.map(|a| game.army_called(a)).unwrap_or_else(|| "the Army".to_string()) }, game.ship_called(*ship)),
@@ -6633,6 +6634,11 @@ fn build_item_of(game: &Game, order: &Order) -> Option<(Place, BuildItem, bool)>
             RearmSite::Yard(c) => Some((Place::Colony(c), BuildItem::Warhead(*ship), false)),
             RearmSite::NoPlace | RearmSite::NoShipyard => None,
         },
+        // Ticket #644 (version 0.1.0.6): a refit is a build in the same yard's queue.
+        Order::Refit { ship } => match game.rearm_site(Seat(0), *ship) {
+            RearmSite::Yard(c) => Some((Place::Colony(c), BuildItem::Refit(*ship), false)),
+            RearmSite::NoPlace | RearmSite::NoShipyard => None,
+        },
         _ => None,
     }
 }
@@ -6666,6 +6672,10 @@ fn build_words(game: &Game, order: &Order) -> Option<String> {
         // Ticket #629 (version 0.1.0.6): and a nuclear hull's second tank, or a Warhead's half.
         let fission = if cost.fissionables > 0.0 { format!(", {} Fissionables", figure(cost.fissionables)) } else { String::new() };
         return Some(format!("{} Materials, {widgets} Widgets, {when}.\nBuilt full: {} Fuel{fission}", cost.materials, cost.fuel));
+    }
+    // Ticket #644 (version 0.1.0.6): a refit is paid in Fissionables, no Materials.
+    if matches!(order, Order::Refit { .. }) {
+        return Some(format!("{} Fissionables, {widgets} Widgets, {when}", figure(cost.fissionables)));
     }
     Some(format!("{} Materials, {widgets} Widgets{people}, {when}", cost.materials))
 }
@@ -9651,6 +9661,12 @@ fn ship_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
     // paragraph when they shared a line. They are different news: stranded is about getting
     // anywhere, dry is about being worth anything when it arrives.
     dry_label(ui, game, s);
+    // Ticket #644 (version 0.1.0.6), from the review: a refit under way is named in flight too.
+    if !matches!(s.at, ShipAt::Body(_))
+        && let Some(c) = refit_yard(game, s.id)
+    {
+        ui.label(format!("Nuclear refit under way at {}.", game.place_name(Place::Colony(c))));
+    }
     let ShipAt::Body(body) = s.at else { return };
     let transits = ui.label(RichText::new("Transit").strong());
     if view.stack_scroll == Some(StackBlock::Transits) {
@@ -9666,6 +9682,29 @@ fn ship_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
         cost_button(ui, game, &session.pending, Order::RepairWithDucats { unit: UnitRef::Ship(s.id), points: s.damage }, "Repair fully with Ducats", actions);
     }
     ship_weapons_block(ui, session, game, view, s, body, actions);
+    ship_refit_block(ui, session, game, s, actions);
+}
+
+/// Ticket #644 (version 0.1.0.6), from the review: the yard where a hull's refit is under way, which
+/// the card names in flight too, since the hull is free meanwhile.
+fn refit_yard(game: &Game, ship: ShipId) -> Option<ColonyId> {
+    game.colonies.iter().find(|c| c.queue.iter().any(|b| b.item == BuildItem::Refit(ship))).map(|c| c.id)
+}
+
+/// Ticket #644 (version 0.1.0.6), at the designer's word: a chemical hull's **Refit nuclear**, once
+/// Nuclear Rockets stands, a build in the yard's queue as a Rearm is, greyed with the reason where it
+/// cannot be given; while one is under way, where.
+fn ship_refit_block(ui: &mut Ui, session: &Session, game: &Game, s: &Ship, actions: &mut Vec<Action>) {
+    if s.nuclear || !game.has_tech(TechId::NuclearRockets) {
+        return;
+    }
+    ui.label(RichText::new("Refit").strong());
+    if let Some(c) = refit_yard(game, s.id) {
+        ui.label(format!("Nuclear refit under way at {}.", game.place_name(Place::Colony(c))));
+        return;
+    }
+    let hover = "Refits the hull to burn Fissionables: shorter crossings, a tenth of each leg's Fuel in Fissionables. One way.".to_string();
+    cost_button_with_hover(ui, game, &session.pending, Order::Refit { ship: s.id }, "Refit nuclear", Some(hover), actions);
 }
 
 /// Ticket #637 (version 0.1.0.6), at the designer's word: an empty Colony Ship in the orbit that

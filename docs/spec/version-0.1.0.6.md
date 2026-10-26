@@ -453,3 +453,29 @@ The designer: stranded Ships (tester 3's at Mercury, 0.6 Fuel) should scrap into
 **32 / 45 / 1 / 2 and 0 collapses**, from §11's 29 / 48 / 1 / 2 and 0. Colony Ships scrapped over the
 80 games: the Prospectors 65, the Archivists 36, the Custodians 30, the Arkwrights 22. Ships stranded
 at the end: 109, from 244. Reported, not tuned.
+
+## 13. Refitting a chemical hull as a nuclear one
+
+Ticket: [Refitting a chemical hull as a nuclear one](https://github.com/whaleyjoshua2/Dying-Earth/issues/644).
+The designer: *"allow chemical hulls to be upgraded"*.
+
+- **Where** (Q1). As a Rearm: at a Colony or station of the seat's with a working Shipyard, the
+  hull in that place's own orbit.
+- **When** (Q2). Once Nuclear Rockets stands.
+- **The price** (Q3). The second tank's fill of Fissionables at the order, and a quarter of the
+  hull's Widgets, rounded up, in the yard's queue; no Materials.
+- **The hull meanwhile** (Q4 a). Free, as a Rearm's carrier is; the refit lands on it wherever it
+  is, its second tank full. A cancel refunds the Fissionables.
+- **One way** (Q5).
+- **The computer** (Q6). Refits a chemical hull standing at a yard of its own with no order that
+  turn, where the Fissionables left after the turn's other spending cover the fill and two tanks more.
+- **The words** (Q7). *Refit nuclear* on the Ship card once Nuclear Rockets stands, priced, greyed
+  with the reason; while one is under way, where, in flight too. Hover: *3 Fissionables, 2 Widgets,
+  ready next turn here. Once it stands: Refits the hull to burn Fissionables: shorter crossings, a
+  tenth of each leg's Fuel in Fissionables. One way.* Text tool `refit <ship>`.
+- **From the review.** A hull whose refit is queued is not scrapped; the second tank is filled to
+  the tank and no further when the refit lands.
+
+**Measured** ([`sweeps/ticket-644.txt`](../dev-diary/2026-10-25-version-0.1.0.6/sweeps/ticket-644.txt)):
+**32 / 45 / 1 / 2 and 0 collapses**, the same wins as §12's. Hulls refitted over the 80 games: the
+Prospectors 20, the Custodians 12, the Archivists 1, the Arkwrights none. Reported, not tuned.

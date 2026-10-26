@@ -2732,6 +2732,19 @@ impl Game {
                     hull.warhead = true;
                 }
             }
+            // Ticket #644 (version 0.1.0.6), Q4: the refit lands on the hull wherever it is, its
+            // second tank filled with what the order paid; a hull lost meanwhile loses it.
+            (_, BuildItem::Refit(id)) => {
+                if let Some((seat, kind)) = self.ship(id).map(|h| (h.seat, h.kind)) {
+                    // From the review: never past the tank, as a new nuclear hull is filled.
+                    let tank = self.fission_tank_of(seat, kind);
+                    if let Some(hull) = self.ship_mut(id) {
+                        hull.nuclear = true;
+                        hull.fissionables = tenth((hull.fissionables + b.fissionables).min(tank));
+                    }
+                    self.war.refits[seat.index()] += 1;
+                }
+            }
             (_, BuildItem::Unit(UnitKind::Army)) => {
                 // Ticket #270 (version 0.08.4): raised through the one door, and named there.
                 self.raise_army(place, false);

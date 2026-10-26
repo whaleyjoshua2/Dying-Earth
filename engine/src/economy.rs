@@ -1348,6 +1348,9 @@ impl Game {
             // Ticket #343 (version 0.09.1): a Warhead is priced flat, the Faction's Ship discount
             // left out. The discount is a shipwright's, and reloading is not shipbuilding.
             BuildItem::Warhead(_) => (t.nuke.rearm_widgets, 1.0),
+            // Ticket #644 (version 0.1.0.6), Q3: a quarter of the hull's Widgets, rounded up, no
+            // discount, as a Warhead has none.
+            BuildItem::Refit(id) => (self.ship(id).map_or(1, |s| t.unit(s.kind).widgets.div_ceil(4)), 1.0),
             // Ticket #559 (version 0.1.0.3): a Replace is half the kind's Widgets, 5 of the Wind Farm's 10 (4 of 8 before ticket #610).
             BuildItem::Replace(k) => (t.facility(k).widgets / 2, fac.facility_materials_multiplier),
         };
@@ -1415,6 +1418,8 @@ impl Game {
             (BuildItem::Unit(k), site) => self.ship_materials_at(seat, site, k),
             // Ticket #343 (version 0.09.1): the rearm's flat price, for the same reason.
             (BuildItem::Warhead(_), _) => self.tables.nuke.rearm_materials as f64,
+            // Ticket #644 (version 0.1.0.6): a refit is paid in Fissionables, no Materials.
+            (BuildItem::Refit(_), _) => 0.0,
             // Ticket #559 (version 0.1.0.3): a Replace is half the kind's price, at the seat's own.
             (BuildItem::Replace(k), _) => tenth(self.facility_materials(seat, k) / 2.0),
         }

@@ -549,6 +549,9 @@ const GRAMMAR: &str = r#"ORDER LINES (one per line; `#` starts a comment; blank 
   rearm <ship>                         load another Warhead, at a Colony or station of yours with a
                                        working Shipyard, in that place's own orbit. It is a build
                                        in that yard's queue: Materials now, Widgets over the turns.
+  refit <ship>                         refit a chemical hull nuclear, once Nuclear Rockets stands, at
+                                       the same kind of yard: the second tank's Fissionables now, a
+                                       quarter of the hull's Widgets in the queue. One way.
 
   influence <place> <amount> [break]   `break` means it, where the spend would break an Accord
   buy-influence <amount>
@@ -858,6 +861,8 @@ fn parse_line(g: &Game, line: &str) -> Result<Line, String> {
         // another at a yard of its own. Both act in the orbit the hull sits in.
         "launch" => Order::Launch { ship: ship_id(g, at(1)?)?, target: place(g, at(2)?)? },
         "rearm" => Order::Rearm { ship: ship_id(g, at(1)?)? },
+        // Ticket #644 (version 0.1.0.6): a chemical hull refitted nuclear at a yard in its orbit.
+        "refit" => Order::Refit { ship: ship_id(g, at(1)?)? },
         "load" => {
             let ship = ship_id(g, at(1)?)?;
             let colonists = count(at(2)?)?;
