@@ -130,6 +130,8 @@ fn moment_from_id(name: &str) -> Option<MomentKind> {
         "sink" => Some(MomentKind::UnderTheSink),
         // Ticket #538 (version 0.1.0.1): staged by the `moment:accord` aid.
         "accord" => Some(MomentKind::AccordEnded),
+        // Ticket #633 (version 0.1.0.6): staged by the `moment:born` aid.
+        "born" => Some(MomentKind::FirstBorn),
         _ => None,
     }
 }
@@ -1574,6 +1576,25 @@ fn build_board(session: &mut Session) {
             g.climate.natural_sink = 1000.0;
             refuse_any_card(g);
             g.end_turn(std::array::from_fn(|_| Vec::new())).expect("the screenshot harness picks a Tech before it drives turns");
+        }
+        // `moment:born` (a building aid, ticket #633, version 0.1.0.6): a Colony of seat 0's on the
+        // Moon a hair short of its first child, so the next turn's growth is the first birth off
+        // Earth and the Report carries the Moment.
+        if std::env::args().any(|a| a == "moment:born") {
+            let body = BodyId::Moon;
+            let slot = g.free_slots_on(body)[0];
+            let cid = ColonyId(g.fresh_id());
+            let modules = [ModuleKind::Core, ModuleKind::Habitat].map(Module::new).to_vec();
+            g.colonies.push(Colony { id: cid, body, slot, control: Control::Controlled(Seat(0)), modules, colonists: 4, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: g.turn, tier: 0, in_orbit: false });
+            g.colony_growth.insert(cid, 0.95);
+            refuse_any_card(g);
+            g.end_turn(std::array::from_fn(|_| Vec::new())).expect("the screenshot harness picks a Tech before it drives turns");
+            // The Accords offered on the turn it ends are refused, so no modal stands over the Moment.
+            while let Some((i, _)) = g.offers_to(Seat(0)).first().copied() {
+                g.answer_offer(Seat(0), i, false).ok();
+            }
+            // And a card drawn on it answered, for the same reason.
+            refuse_any_card(g);
         }
         // `moment:tech` (a building aid, ticket #58): a rival seat pushes the Tech under research
         // over the line, so the Report carries a Tech Moment with the Lead, the margin and the AI's

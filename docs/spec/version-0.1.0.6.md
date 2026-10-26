@@ -13,17 +13,17 @@ pictures and sweeps that decided it are in
 **What the version is.** Version 0.1.0.5 with the designer's list of 2026-10-25. Its spine is a new
 resource, **Fissionables**, found off Earth and richest in the far worlds (§1), which a nuclear hull
 is built and flown with and a Warhead is loaded with (§2), and a new common Reactor burns, the
-Archivists' own building renamed the Accumulator (§3); and the computer is taught to chase them (§4). Beside it, Colony Ships run standing ferry routes (§5), and two Factions' figures and the Prospectors' bar move (§6).
+Archivists' own building renamed the Accumulator (§3); and the computer is taught to chase them (§4). Beside it, Colony Ships run standing ferry routes (§5), two Factions' figures and the Prospectors' bar move (§6), and the first child born off Earth is a Moment (§7).
 
 **What it did to the win column** (80 games, per Faction; every section's own sweep is in it):
 
-| | 0.1.0.5 | §1 Fissionables | §2 the nuclear hull | §3 the Reactor | §4 the chase | §5 ferry routes | §6 the figures | the ideal |
-|---|---|---|---|---|---|---|---|---|
-| Custodians | 18 | 23 | 19 | 28 | 22 | 22 | 30 | 15 |
-| Prospectors | 61 | 51 | 56 | 47 | 56 | 55 | 46 | 15 |
-| Arkwrights | 0 | 3 | 2 | 1 | 1 | 2 | 1 | 15 |
-| Archivists | 1 | 1 | 1 | 1 | 1 | 1 | 3 | 15 |
-| collapses | 0 | 2 | 2 | 3 | 0 | 0 | 0 | 20 |
+| | 0.1.0.5 | §1 Fissionables | §2 the nuclear hull | §3 the Reactor | §4 the chase | §5 ferry routes | §6 the figures | §7 the first-born | the ideal |
+|---|---|---|---|---|---|---|---|---|---|
+| Custodians | 18 | 23 | 19 | 28 | 22 | 22 | 30 | 31 | 15 |
+| Prospectors | 61 | 51 | 56 | 47 | 56 | 55 | 46 | 45 | 15 |
+| Arkwrights | 0 | 3 | 2 | 1 | 1 | 2 | 1 | 1 | 15 |
+| Archivists | 1 | 1 | 1 | 1 | 1 | 1 | 3 | 3 | 15 |
+| collapses | 0 | 2 | 2 | 3 | 0 | 0 | 0 | 0 | 20 |
 
 ## 1. Fissionables, the seventh resource, and Deep Mining and Rich Seam moved
 
@@ -299,3 +299,29 @@ the 50 Fuel in its opening goods line and no longer lists a lift population mult
 
 **Measured** ([`sweeps/ticket-638.txt`](../dev-diary/2026-10-25-version-0.1.0.6/sweeps/ticket-638.txt)):
 **30 / 46 / 1 / 3 and 0 collapses**, from §5's 22 / 55 / 2 / 1 and 0. Reported, not tuned.
+
+## 7. The first child born off Earth
+
+Ticket: [The first humans born off Earth](https://github.com/whaleyjoshua2/Dying-Earth/issues/633).
+
+- **Where** (Q1). The first Colonist ever grown by a Colony's growth (the Arcology's raised rate
+  included) at a Colony **beyond Earth orbit**, the line the Victory count draws: off Earth and not
+  a station in Earth's near orbits, so Earth's L4 and L5 count, Antarctica and the stations over
+  Earth do not. A neutral Colony's births count for nobody and take nothing.
+- **A tie** (Q2). Every seat whose Colony there grows on that turn is first.
+- **The reward** (Q3). `climate.first_born_influence` (5) Influence into the Allotment the seat is
+  about to spend: the growth runs in the Climate phase, after the Income has refilled it. Named
+  second among the Allotment's parts, *First child born off Earth +5*, so the six-line hover shows it.
+- **The words** (Q4, Q5). A Moment every player sees, a kind of its own in the Moments corner:
+  *Yours: the first child born off Earth, at Mare Tranquillitatis on the Moon.*, *+5 Influence*; a
+  rival's name where it is theirs. And a Report line in the same words. (The ticket's draft read
+  *at Tycho: the Prospectors'*; the Report's templates never write "the {faction}", so the name leads.)
+- **The computer** (Q6, Q7, Q8). No weight, except the computer Arkwrights: until somebody has it, a
+  Habitat at, and a landing into, a Colony of their own beyond Earth orbit weigh
+  `first_birth_chase` (1.25).
+- **The measure**: games with the first birth, by seat.
+
+**Measured** ([`sweeps/ticket-633.txt`](../dev-diary/2026-10-25-version-0.1.0.6/sweeps/ticket-633.txt)):
+**31 / 45 / 1 / 3 and 0 collapses**, from §6's 30 / 46 / 1 / 3 and 0. The first child born off Earth,
+in games of 80: the Custodians 29, the Prospectors 22, the Arkwrights 16, the Archivists 13. Reported,
+not tuned.

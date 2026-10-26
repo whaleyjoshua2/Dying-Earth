@@ -2386,7 +2386,8 @@ impl Game {
                     // Colony, where the ferry lands and the uploads draw. Measured: no eligible Colony
                     // ever held more than the Core's four, so a ferry had nowhere to land them.
                     ModuleKind::Habitat if ferry_lift && archive_body == Some(col.body) && self.may_hold_archive(&col) => (Cat::Habitat, self.base_weight(seat, Cat::Habitat) * homeless_bonus),
-                    ModuleKind::Habitat => (Cat::Habitat, self.base_weight(seat, Cat::Habitat)),
+                    // Ticket #633 (version 0.1.0.6): the Arkwrights' chase of the first birth off Earth.
+                    ModuleKind::Habitat => (Cat::Habitat, self.base_weight(seat, Cat::Habitat) * self.ai_first_birth_chase(seat, cid)),
                     ModuleKind::Shipyard => {
                         if col.modules.iter().any(|m| m.kind == ModuleKind::Shipyard) {
                             continue;
@@ -3853,6 +3854,8 @@ impl Game {
                             let (weight, gap) = if over_earth { (self.base_weight(seat, Cat::LoadUnload) * 0.5, 1.0) } else { (self.base_weight(seat, Cat::LoadUnload), gap_for(Cat::LoadUnload, None)) };
                             // Ticket #514 (version 0.1.0.0): a landing at the Capital candidate, chased or not.
                             let weight = if capital_candidate == Some(c.id) { weight * capital_chase } else { weight };
+                            // Ticket #633 (version 0.1.0.6): and the Arkwrights' chase of the first birth off Earth.
+                            let weight = weight * self.ai_first_birth_chase(seat, c.id);
                             push(vec![Order::Unload { ship: s.id, colonists: n, army: false, into: UnloadTarget::Colony(c.id) }], Cat::LoadUnload, weight, gap, 1.0, opp, format!("disembark {} Colonists into {}", n, self.place_name(Place::Colony(c.id))), None);
                         }
                     }
@@ -4674,6 +4677,15 @@ impl Game {
         // Ticket #58: the scored list is the AI's own head, so it stays in the log. What the Report
         // shows is built from the orders this seat actually commits, in `end_turn`.
         chosen
+    }
+
+    /// Ticket #633 (version 0.1.0.6), at the designer's word: **the computer Arkwrights chase the
+    /// first child born off Earth** -- until somebody has it, a Habitat at, and a landing into, a
+    /// Colony of theirs beyond Earth orbit weighs `first_birth_chase`; nothing otherwise.
+    pub fn ai_first_birth_chase(&self, seat: Seat, colony: ColonyId) -> f64 {
+        // From the review: a Colony of the seat's own, not left to the callers' filters.
+        let beyond = self.colony(colony).is_some_and(|c| c.control.director() == Some(seat) && self.off_earth(c) && !self.in_earth_orbit(c));
+        if self.kind(seat) == FactionKind::Arkwrights && self.first_born.is_empty() && beyond { self.tables.ai.thresholds.first_birth_chase } else { 1.0 }
     }
 
     /// Ticket #631 (Q15): the routes a computer seat sets from its chosen orders, each with the

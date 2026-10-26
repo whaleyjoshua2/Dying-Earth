@@ -608,6 +608,10 @@ fission_keep_turns = 20.0
 # place of its own it has delivered to before on a ferry route, and ends the route once the far end
 # has had no room for this many turns.
 ferry_idle_turns = 3
+# Ticket #633 (version 0.1.0.6), at the designer's word: until somebody has the first child born off
+# Earth, the computer Arkwrights weigh a Habitat at, and a landing into, a Colony of theirs beyond
+# Earth orbit by this.
+first_birth_chase = 1.25
 # Ticket #336 (version 0.09.0): what a rival's Colony is worth on the same list, read as this price
 # divided by the price the seat would actually pay for it -- CHEAPEST FIRST, where the rule from
 # ticket #50 ranked by fewest Colonists and never read the threshold at all. Without this the

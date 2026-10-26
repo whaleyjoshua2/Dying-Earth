@@ -206,7 +206,7 @@ fn a_save_without_this_versions_fields_still_loads() {
     // contest, home and Collapse counters (#618, #619, #620), so a 0.1.0.4 save loads. A Battle
     // party's unit names (#614) default the same way, but a turn-four save holds no Battle to cut
     // them from.
-    for name in ["under_sink_eased", "opening_gap", "best_gap_closed", "best_run", "lead_windfall", "card_price_by", "by", "places", "colony_growth", "offline_cause", "produced_total", "opening_met_turn", "opening_run", "launch_site_owed", "archives_lost", "archive_fund_lost", "tier", "offers", "refusals", "greenwash_spent", "home_region", "ended_by", "refused_by", "replacing", "capital_buildings", "capital_built_now", "energy_by_place", "contests", "homes_lost", "homes_taken", "collapse_weighed", "nuclear", "nuclear_hulls_built", "fission_bought", "fission_sold", "routes", "ferried_to", "routes_set", "ferried", "ferry_trips"] {
+    for name in ["under_sink_eased", "opening_gap", "best_gap_closed", "best_run", "lead_windfall", "card_price_by", "by", "places", "colony_growth", "offline_cause", "produced_total", "opening_met_turn", "opening_run", "launch_site_owed", "archives_lost", "archive_fund_lost", "tier", "offers", "refusals", "greenwash_spent", "home_region", "ended_by", "refused_by", "replacing", "capital_buildings", "capital_built_now", "energy_by_place", "contests", "homes_lost", "homes_taken", "collapse_weighed", "nuclear", "nuclear_hulls_built", "fission_bought", "fission_sold", "routes", "ferried_to", "routes_set", "ferried", "ferry_trips", "first_born"] {
         let before = older.len();
         older = cut(&older, name);
         assert!(older.len() < before, "{name} was in the save and is cut");

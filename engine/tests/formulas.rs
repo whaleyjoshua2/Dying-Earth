@@ -12030,7 +12030,7 @@ fn a_rival_closing_on_its_victory_condition_interrupts_the_player_once_a_step() 
     g.end_phase();
     assert_eq!(fired(&g), 2, "rivals only: {:?}", g.report.moments);
     assert_eq!(MomentKind::RivalProgress.rank(), 5, "between a Battle (4) and a Tech (6)");
-    assert_eq!(MomentKind::ALL.len(), 13, "ticket #281 (version 0.08.5) added a place taken by force, #345 (0.09.1) a Body settled first, #405 (0.09.4) the world under the Sink, and #538 (0.1.0.1) an Accord ended");
+    assert_eq!(MomentKind::ALL.len(), 14, "ticket #281 (version 0.08.5) added a place taken by force, #345 (0.09.1) a Body settled first, #405 (0.09.4) the world under the Sink, #538 (0.1.0.1) an Accord ended, and #633 (0.1.0.6) the first child born off Earth");
     assert!(g.tables.report.moment_on(MomentKind::RivalProgress), "on by default");
 }
 
@@ -21096,7 +21096,8 @@ fn the_reports_templates_stay_under_their_word_ceiling() {
     // Ticket #630 (version 0.1.0.6): and by the 9 of a Reactor short of Fissionables.
     // Ticket #631 (version 0.1.0.6): and by the 39 of a ferry route's delivery, its four waits, its
     // end, and a rival's route set and ended.
-    assert!(words <= 2024, "the Report's templates hold {words} words; the ceiling is 2,024 (39 for a ferry route, 9 for Fissionables run short, 10 for a Strip Permit's clauses, 9 for an Occupation's holder, 15 for a rival on yours, 33 for a window and the head, 46 for an Accord's end, 9 for a place handed over twice, 9 for an Army inherited, 12 for an Accord broken, 15% off 2,031, 54 for the race to the Moon, 2 for a rival's upgrade, 8 for an Accord answered, less a word of slack, 17 for a Trade, 9 for a Capital refunded, 5 for an Accord let lapse, 7 for Terms added, 5 for a renewal)");
+    // Ticket #633 (version 0.1.0.6): and by the 18 of the first child born off Earth, its line and Moment.
+    assert!(words <= 2042, "the Report's templates hold {words} words; the ceiling is 2,042 (18 for the first child born off Earth, 39 for a ferry route, 9 for Fissionables run short, 10 for a Strip Permit's clauses, 9 for an Occupation's holder, 15 for a rival on yours, 33 for a window and the head, 46 for an Accord's end, 9 for a place handed over twice, 9 for an Army inherited, 12 for an Accord broken, 15% off 2,031, 54 for the race to the Moon, 2 for a rival's upgrade, 8 for an Accord answered, less a word of slack, 17 for a Trade, 9 for a Capital refunded, 5 for an Accord let lapse, 7 for Terms added, 5 for a renewal)");
     // "The" is gone before a Faction's name, which is drawn in its colour instead.
     assert!(!text.contains("he {faction}"), "a template still says \"the {{faction}}\"");
 }
@@ -27112,4 +27113,74 @@ fn ticket_638_the_faction_figures_are_the_designers() {
         assert!(card.signature.contains(words), "{words}: {}", card.signature);
     }
     assert!(!card.signature.contains("population"), "no Pioneer costs them more: {}", card.signature);
+}
+
+/// Ticket #633 (version 0.1.0.6), at the designer's word: **the first humans born off Earth**. The
+/// first Colonist ever grown at a Colony beyond Earth orbit is a Moment, and its seat gets 5 Influence
+/// once, into the Allotment it is about to spend; two on one turn are both first. A birth on a station
+/// over Earth, or in Antarctica, is no birth off Earth.
+#[test]
+fn ticket_633_the_first_child_born_off_earth_pays_five_influence_once() {
+    let mut g = game();
+    assert_eq!(g.tables.climate.first_born_influence, 5);
+    // Over Earth and in Antarctica: births, but not off Earth.
+    let iss = station_of(&g, Seat(0), BodyId::Earth).unwrap();
+    g.colony_mut(iss).unwrap().modules.extend([Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Habitat)]);
+    g.colony_mut(iss).unwrap().colonists = 6;
+    g.colony_growth.insert(iss, 0.9);
+    let ice = colony(&mut g, Seat(1), BodyId::Earth, &[ModuleKind::Habitat], 4);
+    g.colony_growth.insert(ice, 0.95);
+    g.colony_growth_step();
+    assert!(g.colony(iss).unwrap().colonists > 6 && g.colony(ice).unwrap().colonists > 4, "both grew");
+    assert!(g.first_born.is_empty(), "neither is off Earth: {:?}", g.first_born);
+    assert!(!g.report.moments.iter().any(|m| m.kind == MomentKind::FirstBorn));
+
+    // Two Colonies beyond Earth orbit cross a whole Colonist on one turn: both are first.
+    let tycho = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Habitat], 4);
+    let mars = colony(&mut g, Seat(2), BodyId::Mars, &[ModuleKind::Habitat], 4);
+    let slow = colony(&mut g, Seat(3), BodyId::Mars, &[ModuleKind::Habitat], 4);
+    // From the review: the hover shows six parts, so a seat with six already still sees this one.
+    g.seat_mut(Seat(0)).allotment_parts = (0..7).map(|i| (format!("part {i}"), 1)).collect();
+    g.colony_growth.insert(tycho, 0.95);
+    g.colony_growth.insert(mars, 0.95);
+    let before = (g.seat(Seat(0)).allotment, g.seat(Seat(2)).allotment, g.seat(Seat(3)).allotment);
+    g.colony_growth_step();
+    assert_eq!(g.colony(tycho).unwrap().colonists, 5);
+    let mut firsts: Vec<Seat> = g.first_born.iter().map(|f| f.0).collect();
+    firsts.sort();
+    assert_eq!(firsts, vec![Seat(0), Seat(2)]);
+    assert_eq!((g.seat(Seat(0)).allotment, g.seat(Seat(2)).allotment, g.seat(Seat(3)).allotment), (before.0 + 5, before.1 + 5, before.2), "5 each, into the Allotment now");
+    assert!(g.allotment_lines(Seat(0)).iter().any(|l| l == "First child born off Earth +5"), "{:?}", g.allotment_lines(Seat(0)));
+    let moments: Vec<&Moment> = g.report.moments.iter().filter(|m| m.kind == MomentKind::FirstBorn).collect();
+    assert_eq!(moments.len(), 2, "one for each");
+    assert!(moments.iter().any(|m| m.text.starts_with("Yours:")), "{:?}", moments.iter().map(|m| &m.text).collect::<Vec<_>>());
+    assert!(moments.iter().all(|m| m.text.contains("first child born off Earth") && m.figure == "+5 Influence"));
+
+    // Once a game: a later first at another seat pays nothing.
+    g.colony_growth.insert(slow, 0.95);
+    let (n, moments) = (g.seat(Seat(3)).allotment, g.report.moments.len());
+    g.colony_growth_step();
+    assert_eq!(g.colony(slow).unwrap().colonists, 5);
+    assert_eq!((g.seat(Seat(3)).allotment, g.report.moments.len()), (n, moments));
+}
+
+/// Ticket #633, at the designer's word (Q7, Q8): until somebody has the first birth, the computer
+/// Arkwrights weigh a Habitat at, and a landing into, a Colony of theirs beyond Earth orbit x1.25.
+#[test]
+fn ticket_633_the_computer_arkwrights_chase_the_first_birth() {
+    let mut g = game();
+    assert_eq!(g.tables.ai.thresholds.first_birth_chase, 1.25);
+    let ark = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Arkwrights).unwrap();
+    let moon = colony(&mut g, ark, BodyId::Moon, &[ModuleKind::Habitat], 4);
+    // From the review: the other seat chosen by its Faction, not by its number.
+    let other = Seat::ALL.into_iter().find(|s| *s != ark).unwrap();
+    let theirs = colony(&mut g, other, BodyId::Moon, &[ModuleKind::Habitat], 4);
+    let iss = station_of(&g, Seat(0), BodyId::Earth).unwrap();
+    g.colony_mut(iss).unwrap().control = Control::Controlled(ark);
+    assert_eq!(g.ai_first_birth_chase(ark, moon), 1.25);
+    assert_eq!(g.ai_first_birth_chase(ark, iss), 1.0, "over Earth is no birth off Earth");
+    assert_eq!(g.ai_first_birth_chase(other, theirs), 1.0, "the Arkwrights' alone");
+    assert_eq!(g.ai_first_birth_chase(ark, theirs), 1.0, "and at a Colony of their own");
+    g.first_born.push((other, theirs, g.turn));
+    assert_eq!(g.ai_first_birth_chase(ark, moon), 1.0, "once somebody has it, the chase ends");
 }

@@ -81,6 +81,8 @@ first_to_body_eases = "The first Colony on {body} eased Unrest by {ease} in ever
 # Ticket #405 (version 0.09.4): the world under the Natural Sink for the first time, once a game.
 under_the_sink_eases = "First turn under the Natural Sink: Unrest eased by {ease} in every Region, {custodians} in the Custodians'."
 disembarked = "{n} disembarked into {colony}."
+# Ticket #633 (version 0.1.0.6): the first child born beyond Earth orbit; {faction} is "Yours" for the player.
+first_born = "{faction}: the first child born off Earth, at {colony}. +{n} Influence."
 # Ticket #631 (version 0.1.0.6): a ferry route's delivery, its waits, each said once, and its end.
 ferried = "{ship} ferried {n} to {colony}."
 ferry_wait_nobody = "{ship} waits: nobody to carry."
@@ -508,6 +510,13 @@ founded = "founded {colony}"
 on = true
 text = "{faction} founded {colony}, {note}."
 figure = "{n}"
+
+# Ticket #633 (version 0.1.0.6), at the designer's word: the first child born beyond Earth orbit.
+# {faction} reads "Yours" where it is the player's.
+[moments.first_born]
+on = true
+text = "{faction}: the first child born off Earth, at {colony}."
+figure = "+{n} Influence"
 
 # Ticket #345 (version 0.09.1): the first Faction to put a Colony on the ground of a world.
 [moments.first_to_body]

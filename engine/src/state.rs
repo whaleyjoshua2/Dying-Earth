@@ -1367,6 +1367,9 @@ pub struct WarCounters {
     pub ferried: [u32; SEAT_COUNT],
     #[serde(default)]
     pub ferry_trips: [u32; SEAT_COUNT],
+    /// Ticket #633 (version 0.1.0.6): games in which the seat had the first child born off Earth.
+    #[serde(default)]
+    pub first_born: [u32; SEAT_COUNT],
     /// Ticket #300 (version 0.08.6): Armies landed from a Carrier at a Colony, by seat. Never
     /// counted before; the reviews measured no Army carried by anybody in eighty games.
     #[serde(default)]
@@ -1483,6 +1486,7 @@ impl WarCounters {
             self.routes_set[i] += o.routes_set[i];
             self.ferried[i] += o.ferried[i];
             self.ferry_trips[i] += o.ferry_trips[i];
+            self.first_born[i] += o.first_born[i];
             self.armies_landed[i] += o.armies_landed[i];
             self.interceptions[i] += o.interceptions[i];
             self.batteries_lost[i] += o.batteries_lost[i];
@@ -1915,6 +1919,9 @@ pub struct Game {
     pub offers: Vec<Offer>,
     /// Ticket #631 (version 0.1.0.6): the Colony Ships' standing ferry routes. In the save.
     pub routes: Vec<crate::route::Route>,
+    /// Ticket #633 (version 0.1.0.6): the first children born off Earth -- each seat first on the
+    /// turn it happened, its Colony and the turn. Empty until then. In the save.
+    pub first_born: Vec<(Seat, ColonyId, u32)>,
     /// Ticket #519 (version 0.1.0.0): Armies abroad that changed hands with their Region, and the
     /// turn they did: a turn's grace from the rule that puts a rival's guest on Attack. In the save.
     pub armies_inherited: Vec<(ArmyId, u32)>,
@@ -2185,6 +2192,7 @@ impl Game {
             accords: Vec::new(),
             offers: Vec::new(),
             routes: Vec::new(),
+            first_born: Vec::new(),
             armies_inherited: Vec::new(),
             refusals: Vec::new(),
             refused_trades: Vec::new(),

@@ -738,6 +738,17 @@ impl Game {
                 grew.entry(seat).or_default().push((id, change));
             }
         }
+        // Ticket #633 (version 0.1.0.6), at the designer's word: the first child ever born beyond
+        // Earth orbit. Every seat whose Colony there grew on this turn is first, once a game.
+        if self.first_born.is_empty() {
+            let firsts: Vec<(Seat, ColonyId)> = grew
+                .iter()
+                .filter_map(|(seat, places)| places.iter().find(|(c, n)| *n > 0 && self.colony(*c).is_some_and(|col| self.off_earth(col) && !self.in_earth_orbit(col))).map(|(c, _)| (*seat, *c)))
+                .collect();
+            for (seat, colony) in firsts {
+                self.first_born_at(seat, colony);
+            }
+        }
         // One line a seat under its works: what grew and what was lost, with the places.
         for (seat, places) in grew {
             let (up, down): (i64, i64) = (places.iter().filter(|p| p.1 > 0).map(|p| p.1).sum(), -places.iter().filter(|p| p.1 < 0).map(|p| p.1).sum::<i64>());
@@ -752,6 +763,28 @@ impl Game {
             let text = self.say(key, &[("up", up.to_string()), ("down", down.to_string()), ("places", named.join(", "))]);
             self.report_line_of(seat, LineKind::YourWorks, LineKind::Note, None, text);
         }
+    }
+
+    /// Ticket #633: the first child born off Earth, at this seat's Colony: 5 Influence into the
+    /// Allotment it is about to spend -- the Income has already refilled it this turn, so a windfall
+    /// held for the next would wait a turn -- named among its parts, a Report line and a Moment.
+    fn first_born_at(&mut self, seat: Seat, colony: ColonyId) {
+        let n = self.tables.climate.first_born_influence;
+        self.first_born.push((seat, colony, self.turn));
+        self.war.first_born[seat.index()] += 1;
+        let s = self.seat_mut(seat);
+        s.allotment += n;
+        // From the review: second among the parts, after the base, since the hover shows six.
+        let at = s.allotment_parts.len().min(1);
+        s.allotment_parts.insert(at, ("First child born off Earth".to_string(), n));
+        let whose = if seat == Seat(0) && !self.spectator { "Yours".to_string() } else { self.seat_name(seat) };
+        let args = [("faction", whose), ("colony", self.place_name(Place::Colony(colony))), ("n", n.to_string())];
+        self.log(format!("The first child born off Earth: {} at {}, {} Influence.", self.seat_name(seat), args[1].1, n));
+        let text = self.say("first_born", &args);
+        self.report_line(LineKind::ColonyFounded, Some(ReportPlace::Colony(colony)), text);
+        // From the review: the player's own is listed under their works as well.
+        self.mark_mine(&[Some(seat)]);
+        self.moment(MomentKind::FirstBorn, &args, Some(ReportPlace::Colony(colony)));
     }
 
     fn population_change(&mut self) {

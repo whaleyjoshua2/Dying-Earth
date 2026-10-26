@@ -1170,6 +1170,9 @@ pub struct ClimateTable {
     pub colony_growth: f64,
     /// Ticket #588 (version 0.1.0.4): the growth share instead at a station in Earth's near orbits.
     pub colony_growth_earth_orbit: f64,
+    /// Ticket #633 (version 0.1.0.6): the Influence the first child born beyond Earth orbit pays its
+    /// seat, once a game.
+    pub first_born_influence: i64,
     pub colony_decline: u32,
     /// Ticket #333 (version 0.09.0): the population figure's unit, in people. A Region's figure, a
     /// Colonist and a Pioneer are all counted in it, so `Region population 380.0` is 380 million
@@ -1692,6 +1695,9 @@ pub struct AiThresholds {
     /// room for this many turns.
     #[serde(default = "ferry_idle_turns_default")]
     pub ferry_idle_turns: u32,
+    /// Ticket #633 (version 0.1.0.6): the computer Arkwrights' chase of the first birth off Earth.
+    #[serde(default = "first_birth_chase_default")]
+    pub first_birth_chase: f64,
     /// Ticket #336 (version 0.09.0): the price a rival's Colony is weighed against on the same
     /// list -- the weight is this over what the seat would pay, so the cheapest place ranks first.
     #[serde(default = "colony_price_pivot_default")]
@@ -3364,6 +3370,10 @@ fn fission_keep_turns_default() -> f64 {
 
 fn ferry_idle_turns_default() -> u32 {
     3
+}
+
+fn first_birth_chase_default() -> f64 {
+    1.25
 }
 
 

@@ -96,6 +96,10 @@ colony_growth = 0.02
 # Ticket #588 (version 0.1.0.4), at the designer's word ("population growth there is 1/3rd faster",
 # made an even 0.03): the share instead at a station in Earth's near orbits -- not Earth L4 or L5.
 colony_growth_earth_orbit = 0.03
+# Ticket #633 (version 0.1.0.6), at the designer's word: the first Colonist ever grown at a Colony
+# beyond Earth orbit is a Moment, and its seat gets this much Influence once ("give the seat who did
+# it a one time +5 influence"), into the Allotment it is about to spend.
+first_born_influence = 5
 colony_decline = 1
 # Ticket #333 (version 0.09.0): the population figure's unit, in people. A Region's figure, a
 # Colonist and a Pioneer are all counted in it, so `Region population 380.0` is 380 million people

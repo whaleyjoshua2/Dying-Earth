@@ -297,3 +297,38 @@ three test names still told the old figures, and are moved.
 
 The Prospectors fell nine and the Custodians took them; the Arkwrights lost the one they had gained.
 Reported, not tuned.
+
+## The first child born off Earth
+
+Ticket [#633](https://github.com/whaleyjoshua2/Dying-Earth/issues/633), spec §7. Decided in three rounds;
+the designer asked *"can we give the arkwrights a small push on this?"* and chose the computer's
+push: its Arkwrights chase Habitats and landings beyond Earth orbit a quarter harder until somebody
+has the first birth.
+
+**Built test first**, red on its missing names, then five rules broken on purpose to watch their tests
+fail: the line beyond Earth orbit, once a game, the tie, the chase being the Arkwrights', and its end.
+
+**The picture** took three runs. The Moment stood behind three Accord offers on the first, then behind a
+drawn card; the aid answers both now, and with `menus:1` the Report picture opens on the Moment.
+
+![The Moment](ticket-633/moment-earth.png)
+
+**The review** found nothing that blocks. The +5 sat last among the Allotment's parts and the hover
+shows six, so a seat with six parts already never saw it; it is second now, with a test that is red
+on the old place. The chase now checks the Colony is the seat's own rather than trusting its callers,
+the Report line is marked as the player's work, and a test that picked "not the Arkwrights" by seat
+number picks by Faction. Kept as it is: a save from before this version, loaded after a birth off Earth
+has happened in it, will award the Moment at the next one.
+
+**The sweep** ([`sweeps/ticket-633.txt`](sweeps/ticket-633.txt)): **31 / 45 / 1 / 3 and 0 collapses**,
+from 30 / 46 / 1 / 3 and 0.
+
+| | First child born off Earth (games) | Materials | Fuel | Energy | Ducats | Research | Fissionables |
+|---|---|---|---|---|---|---|---|
+| Custodians | 29 | 2,398 | 686 | 1,056 | 1,074 | 1,214 | 75.5 |
+| Prospectors | 22 | 1,855 | 454 | 626 | 1,600 | 269 | 63.2 |
+| Arkwrights | 16 | 676 | 107 | 207 | 2,611 | 263 | 1.5 |
+| Archivists | 13 | 447 | 260 | 26 | 631 | 719 | 3.4 |
+
+The goods are each Faction's income a game, net of upkeep. There was no count of first births before
+this ticket, so the Arkwrights' 16 has nothing to be set against. Reported, not tuned.

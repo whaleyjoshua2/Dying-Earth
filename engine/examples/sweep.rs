@@ -832,6 +832,8 @@ fn main() {
                             println!("      Fissionables bought / sold at the market over the batch, by seat {:?} / {:?}", warc.fission_bought, warc.fission_sold);
                             // Ticket #631 (version 0.1.0.6).
                             println!("      Ferry routes set / Colonists ferried / deliveries over the batch, by seat {:?} / {:?} / {:?}", warc.routes_set, warc.ferried, warc.ferry_trips);
+                            // Ticket #633 (version 0.1.0.6).
+                            println!("      Games with the first child born off Earth, by seat {:?}", warc.first_born);
                             // Ticket #300 (version 0.08.6): Armies landed from a Carrier, by seat.
                             println!("      Armies landed at a Colony over the batch, by seat {:?}", warc.armies_landed);
                             // Ticket #319 (version 0.08.8): interceptions fought, by the intercepting seat.
