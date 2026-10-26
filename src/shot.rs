@@ -1800,6 +1800,19 @@ fn build_board(session: &mut Session) {
     {
         g.raise_army(Place::State(sid), false);
     }
+    // `army:dugin` (a building aid, ticket #635): seat 0's Armies in its start state dig in, then a
+    // new Army is raised there, so the card shows the newcomer joining the dug-in stack.
+    if std::env::args().any(|a| a == "army:dugin")
+        && let Some(g) = session.game.as_mut()
+        && let Some(sid) = g.directed_states(Seat(0)).first().copied()
+    {
+        for id in g.armies_of_seat_at(Seat(0), Place::State(sid)) {
+            if let Some(a) = g.army_mut(id) {
+                a.stance = Stance::DigIn;
+            }
+        }
+        g.raise_army(Place::State(sid), false);
+    }
     // `passage:1` (a building aid, ticket #320): a Passage Accord stands between seat 0 and seat 1,
     // so a partner's Region reads "move to" on seat 0's card and its hover says why.
     if std::env::args().any(|a| a == "passage:1")

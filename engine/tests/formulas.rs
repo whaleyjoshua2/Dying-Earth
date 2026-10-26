@@ -12946,11 +12946,17 @@ fn the_computer_marches_a_stack_where_one_army_alone_would_not_clear_the_bar() {
         a.stance = Stance::DigIn;
     }
     let first = g.raise_army(Place::State(home), false);
+    // Ticket #635 (version 0.1.0.6): a new Army now joins China's dug-in stance and cannot march
+    // until the stance changes (in play a computer seat that keeps digging in at a threatened home
+    // keeps its new Armies there, measured nowhere yet); these two are put on Hold, free to march,
+    // which is the massing this test weighs.
     g.armies.iter_mut().find(|a| a.id == first).unwrap().raised_strength = 4;
+    g.army_mut(first).unwrap().stance = Stance::Hold;
     let alone: Vec<Order> = g.ai_orders(Seat(0));
     assert!(!alone.iter().any(|o| matches!(o, Order::MoveArmy { to, .. } if *to == target)), "one Army alone does not march on Russia: {alone:?}");
     let second = g.raise_army(Place::State(home), false);
     g.armies.iter_mut().find(|a| a.id == second).unwrap().raised_strength = 4;
+    g.army_mut(second).unwrap().stance = Stance::Hold;
     let together: Vec<Order> = g.ai_orders(Seat(0));
     let marched: Vec<ArmyId> = together.iter().filter_map(|o| match o { Order::MoveArmy { army, to } if *to == target => Some(*army), _ => None }).collect();
     assert!(marched.contains(&first) && marched.contains(&second), "the stack of two marches on Russia together: {together:?}");
@@ -27387,4 +27393,70 @@ fn ticket_634_the_line_speaks_for_the_holder_and_counts_each_kind_apart() {
     assert_eq!(g.threat_holder(mars), Some(Seat(0)));
     let line = g.threat_line(Seat(0), mars).unwrap();
     assert!(!line.contains("Custodian"), "the holder's own Ships and Standing are no threat to it: {line}");
+}
+
+// ---------------------------------------------------------------- 0.1.0.6 ticket #635: a new Army joins its stack
+
+fn newest_army(g: &Game) -> Army {
+    g.armies.iter().max_by_key(|a| a.id.0).expect("an Army").clone()
+}
+
+/// Ticket #635 (Q1, Q2): a newly finished Army takes the stance of its side's Armies at its place,
+/// a dug-in stack's newcomer dug in from the turn it is finished.
+#[test]
+fn ticket_635_a_new_army_joins_its_stacks_stance() {
+    for stance in [Stance::DigIn, Stance::Evade] {
+        let mut g = game();
+        let place = Place::State(StateId::EastAsia);
+        for id in g.armies_of_seat_at(Seat(0), place) {
+            g.army_mut(id).unwrap().stance = stance;
+        }
+        assert!(!g.armies_of_seat_at(Seat(0), place).is_empty(), "the Standing Army stands there");
+        build_now(&mut g, place, BuildItem::Unit(UnitKind::Army), Seat(0));
+        g.resolution_phase();
+        let new = newest_army(&g);
+        assert_eq!(new.at, ArmyAt::Place(place));
+        assert_eq!(new.stance, stance, "{} joined the stack", new.name);
+        // Q2, from the review: dug in from the turn it is finished, with Dig In's restraint.
+        if stance == Stance::DigIn {
+            let refusal = g.check_order(Seat(0), &[], &Order::MoveArmy { army: new.id, to: StateId::Russia }).unwrap_err().0;
+            assert!(refusal.contains("dug in"), "{refusal}");
+        }
+    }
+}
+
+/// Ticket #635 (Q1): with none of its side's Armies at its place -- a rival's there does not count --
+/// a new Army stands on Hold.
+#[test]
+fn ticket_635_a_new_army_alone_stands_on_hold() {
+    let mut g = game();
+    g.seats[0].stockpile.materials = 2000.0;
+    let c = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Barracks], 3);
+    for a in g.armies.iter_mut() {
+        a.stance = Stance::DigIn;
+    }
+    let rival = g.armies.iter().find(|a| g.army_seat(a).is_some_and(|s| s != Seat(0))).expect("a rival's Army").id;
+    g.army_mut(rival).unwrap().at = ArmyAt::Place(Place::Colony(c));
+    build_now(&mut g, Place::Colony(c), BuildItem::Unit(UnitKind::Army), Seat(0));
+    g.resolution_phase();
+    let new = newest_army(&g);
+    assert_eq!(new.at, ArmyAt::Place(Place::Colony(c)));
+    assert_eq!(new.stance, Stance::Hold, "{} has no stack of its own side to join", new.name);
+}
+
+/// Ticket #635 (Q3): a stack on mixed stances gives the newcomer the stance most of it holds, and on
+/// a tie the first-raised Army's, the one its card shows.
+#[test]
+fn ticket_635_a_mixed_stack_gives_the_most_held_stance() {
+    let mut g = game();
+    let place = Place::State(StateId::EastAsia);
+    let first = g.armies_of_seat_at(Seat(0), place)[0];
+    g.army_mut(first).unwrap().stance = Stance::Evade;
+    let second = g.raise_army(place, false);
+    g.army_mut(second).unwrap().stance = Stance::DigIn;
+    let tie = g.raise_army(place, false);
+    assert_eq!(g.army(tie).unwrap().stance, Stance::Evade, "a tie goes to the first raised");
+    g.army_mut(tie).unwrap().stance = Stance::DigIn;
+    let most = g.raise_army(place, false);
+    assert_eq!(g.army(most).unwrap().stance, Stance::DigIn, "two of three are dug in");
 }

@@ -396,3 +396,36 @@ Left for the designer: an armed Missile Carrier over the Colony is not named, si
 
 **The sweep** ([`sweeps/ticket-634.txt`](sweeps/ticket-634.txt)): **30 / 46 / 1 / 3 and 0 collapses**,
 identical to the convoy's, as a change to what is read and not to what is done should be.
+
+## A new Army joins its stack's stance
+
+Ticket [#635](https://github.com/whaleyjoshua2/Dying-Earth/issues/635), spec §10. The ticket came in as
+Barracks that raise and repair their Garrisons on their own, and the first round asked about that.
+The designer: *"I don't want barracks to be stealing people and resources to just endless build
+armies in the background. The note from the playtester was about newly built armies sitting idle
+when built rather than reinforcing the stack that is there."* The ticket was rewritten to that and
+decided in a second round.
+
+**What was wrong.** Every Army came into the game on Hold. Beside a dug-in stack the newcomer fought
+without the +2, beside an attacking one it stood, and the card's stance row, which reads the first
+Army, still said the stack's stance.
+
+**Built** in `raise_army`, the one door every Army comes through. Each rule broken on purpose: the
+joining, the own-side filter, the tie to the first raised, the most-held count; each went red. One
+older test (the computer massing a stack, ticket #322) had dug in China's own Army to keep it out and
+then raised two Armies it expected free to march; they now joined the dig-in, so the fixture puts
+them on Hold.
+
+![China's card: the 2nd Chinese Army raised beside a dug-in stack, dug in, defends at 6](ticket-635/joined-earth.png)
+![The control: no dig-in, both on Hold](ticket-635/control-earth.png)
+
+**The review** found no defect in the rule as decided. Mended: the tie rule's doc comment claimed the
+newcomer always takes the card's stance, which a tie between two later stances belies; and Q2's
+restraint is now tested (a dug-in newcomer refused a march, red when the refusal is removed). Left for
+the designer: a computer seat orders Dig In at a home with an enemy near every turn, so its new
+Armies there, which used to stand one turn on Hold and could march with a stack, now stay; and the
+Standing Army's return joins the stack too, which Q1 did not name.
+
+**The sweep** ([`sweeps/ticket-635.txt`](sweeps/ticket-635.txt)): **30 / 47 / 0 / 3 and 0 collapses**,
+from 30 / 46 / 1 / 3. One game moved, seed 5 with the Prospectors seated first, from the Arkwrights to
+the Prospectors.

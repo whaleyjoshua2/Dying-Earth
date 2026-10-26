@@ -3241,7 +3241,12 @@ impl Game {
 
     /// Which seat an Army fights for, if any: it follows its home (spec 8.4).
     pub fn army_seat(&self, a: &Army) -> Option<Seat> {
-        match a.home {
+        self.home_seat(a.home)
+    }
+
+    /// The seat an Army raised from this home answers to.
+    pub fn home_seat(&self, home: ArmyHome) -> Option<Seat> {
+        match home {
             ArmyHome::State(s) => match self.state(s).control {
                 Control::Controlled(seat) => Some(seat),
                 _ => None,
@@ -3437,8 +3442,23 @@ impl Game {
             }
         };
         let raised_strength = if standing { 0 } else { self.raised_strength_at(place) };
-        self.armies.push(Army { id, name, home, at: ArmyAt::Place(place), damage: 0, standing, stance: Stance::Hold, escaped: false, move_to: None, levy: false, raised_strength });
+        // Ticket #635 (version 0.1.0.6), at the designer's word: a new Army joins its stack's stance,
+        // where it had stood on Hold beside a dug-in or attacking stack while the card showed the
+        // stack's. Hold only where none of its side's Armies stand.
+        let stance = self.home_seat(home).and_then(|seat| self.stack_stance(seat, place)).unwrap_or(Stance::Hold);
+        self.armies.push(Army { id, name, home, at: ArmyAt::Place(place), damage: 0, standing, stance, escaped: false, move_to: None, levy: false, raised_strength });
         id
+    }
+
+    /// Ticket #635 (Q3): the stance a seat's Armies at a place hold, as a newcomer joins it: the one
+    /// most of them hold, and on a tie the one the earliest raised of the tied holds (from the
+    /// review: not always the card's, which shows the first Army's whatever the count). Armies
+    /// standing down are no part of the stack, as the Region card reads it.
+    pub fn stack_stance(&self, seat: Seat, place: Place) -> Option<Stance> {
+        let stack: Vec<Stance> = self.armies.iter().filter(|a| a.at == ArmyAt::Place(place) && self.army_seat(a) == Some(seat) && !self.army_stands_down(a)).map(|a| a.stance).collect();
+        let count = |s: Stance| stack.iter().filter(|x| **x == s).count();
+        let most = stack.iter().map(|s| count(*s)).max()?;
+        stack.iter().copied().find(|s| count(*s) == most)
     }
 
     /// Ticket #270: what an Army is called -- its name, or for a save from before names the old form.

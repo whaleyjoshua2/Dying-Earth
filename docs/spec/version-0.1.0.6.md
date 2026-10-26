@@ -376,3 +376,27 @@ Ticket: [A Colony card's threats line](https://github.com/whaleyjoshua2/Dying-Ea
 **Measured** ([`sweeps/ticket-634.txt`](../dev-diary/2026-10-25-version-0.1.0.6/sweeps/ticket-634.txt)):
 **30 / 46 / 1 / 3 and 0 collapses**, the same board as §8's, figure for figure: the line changes what
 a player reads, not what any seat does.
+
+## 10. A new Army joins its stack's stance
+
+Ticket: [A new Army joins its stack's stance](https://github.com/whaleyjoshua2/Dying-Earth/issues/635).
+The playtester's note: newly built Armies sat idle rather than reinforcing the stack that was there.
+Every Army had been raised on Hold, and the card's stance row shows the first Army's, so a dug-in
+stack's newcomer fought without the +2 while the row read *Dig In*. (The ticket first asked for
+Barracks that raise and repair on their own; the designer: not the point.)
+
+- **The rule** (Q1). A new Army takes the stance of its side's Armies at its place; Hold only where
+  none stand. Every raise: a Region's or a Colony's, ordered or a card's, a Standing Army's return.
+- **Dug in at once** (Q2), with Dig In's restraint: no march or boarding until the stance is changed
+  and the turn has passed.
+- **A mixed stack** (Q3). The stance most of it holds; on a tie the one the earliest raised of the
+  tied holds, usually the one the card shows. Armies standing down under Occupation are no part of it, as the card reads it.
+- **New Armies only** (Q4). An Army marching or landing in keeps the stance it was given.
+- **No Report line** (Q5).
+- **The computer** (from the review). A computer seat orders Dig In at a home with an enemy near,
+  every turn. A new Army there used to stand its first turn on Hold and could march with a stack;
+  now it is dug in from birth and stays. Reported, not changed.
+
+**Measured** ([`sweeps/ticket-635.txt`](../dev-diary/2026-10-25-version-0.1.0.6/sweeps/ticket-635.txt)):
+**30 / 47 / 0 / 3 and 0 collapses**, from §9's 30 / 46 / 1 / 3 and 0. One game moved: seed 5 with the
+Prospectors seated first, the Arkwrights' only win there, now the Prospectors'. Reported, not tuned.
