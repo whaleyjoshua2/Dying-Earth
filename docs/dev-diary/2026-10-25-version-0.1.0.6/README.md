@@ -457,3 +457,29 @@ home, so a computer seat's inherited Army may wait abroad for good; not measured
 **The sweep** ([`sweeps/ticket-636.txt`](sweeps/ticket-636.txt)), after the review's mends: **29 / 48 / 1 / 2
 and 0 collapses**, from 30 / 47 / 0 / 3, with fewer Battles in every seating: 37 from 42, 102 from 110,
 38 from 39, 26 from 27.
+
+## Scrapping a Colony Ship into the Colony below
+
+Ticket [#637](https://github.com/whaleyjoshua2/Dying-Earth/issues/637), spec §12. The draft offered half
+a hull's Materials or a Module of up to its price, for any hull. The designer cut it to one thing: an
+empty Colony Ship becomes a free Habitat; the tank is lost. Decided in two rounds.
+
+**Built**: a Scrap order whose checks are the Habitat build's own, so the slot cap and a station's
+list come for free, and the Habitat takes its slot among the turn's other builds. The computer reads
+a new record of when each Ship was first found stranded. Eight rules broken on purpose, each red; the
+eighth (a rescued Ship's count starting afresh) went green at first, and a test was added for it.
+
+![The stranded Colony Ship at Mercury, its Scrap button and hover](ticket-637/card-mercury.png)
+![The Colony's grid with the scrapped hull's Habitat ordered, and its hover](ticket-637/pending-mercury.png)
+
+**The review** found no rule broken. Mended: a Scrap stood beside a Set route on the same hull, which
+left a route for a Ship that no longer existed, and beside a Refuel or a Load, paid for and lost;
+each now refuses the other. The Colony grid drew the Habitat as a Widget build (*0 of 0*, *N Widgets,
+X turns*); it now reads *from the scrapped hull. Lands this turn.* A rival's scrap is seen where the
+Colony is. Tests for the station ring, an Army aboard, transit, a slot taken this turn, the tank lost
+and the computer leaving a hull with people aboard; three more rules broken on purpose, each red.
+Left for the designer: the Scrap lands when the orders are committed, before the turn's Battles, so
+an empty Colony Ship about to be destroyed can become a Habitat instead.
+
+**The sweep** ([`sweeps/ticket-637.txt`](sweeps/ticket-637.txt)): **32 / 45 / 1 / 2 and 0 collapses**,
+from 29 / 48 / 1 / 2; 153 Colony Ships scrapped, and the Ships stranded at the end fell from 244 to 109.

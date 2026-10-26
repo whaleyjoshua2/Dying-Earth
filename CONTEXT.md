@@ -124,7 +124,7 @@ The Fuel a Ship carries, since version 0.06.0: a figure per Ship type (since ver
 _Avoid_: fuel tank, propellant, range, fuel level
 
 **Stranded**:
-Said of a Ship at a Body whose Tank cannot pay any leg from there and that has nothing to fill it: no station of its own Faction's, or a partner's under a Refuel Accord, in its own orbit or reachable by a change of orbit it can still pay for, and since version 0.09.3 no ground Colony with a working Refinery under a low orbit it sits in or can reach. A Ship at nought Fuel with its own station in another orbit is stranded, since the change of orbit costs one Fuel. Since version 0.09.1 a Battle's two-Fuel charge makes it far commoner. It lasts until a station, or such a Colony, stands where the Ship can reach it. Since version 0.09.2 a leg that would leave the hull stranded at the far end is named beside its button (*arrives with 0 Fuel and no station of yours at Venus*), a warning and never a refusal.
+Said of a Ship at a Body whose Tank cannot pay any leg from there and that has nothing to fill it: no station of its own Faction's, or a partner's under a Refuel Accord, in its own orbit or reachable by a change of orbit it can still pay for, and since version 0.09.3 no ground Colony with a working Refinery under a low orbit it sits in or can reach. A Ship at nought Fuel with its own station in another orbit is stranded, since the change of orbit costs one Fuel. Since version 0.09.1 a Battle's two-Fuel charge makes it far commoner. It lasts until a station, or such a Colony, stands where the Ship can reach it. Since version 0.09.2 a leg that would leave the hull stranded at the far end is named beside its button (*arrives with 0 Fuel and no station of yours at Venus*), a warning and never a refusal. Since version 0.1.0.6 an empty stranded Colony Ship over a Colony of its own can be **Scrapped** into a Habitat there.
 _Avoid_: out of fuel, dry (that is a warship under the Battle charge), marooned, adrift
 
 **Build Where You Dig**:
@@ -563,7 +563,11 @@ _Avoid_: offshoring, relocation bonus, the mothball bonus
 
 **Decommission**:
 The Orders-phase order that takes a Facility or a Module down for good: a turn later half its Materials come back, its slot is free, and it is gone. In a Region it raises Unrest more than a Mothball does; in a Colony it raises none.
-_Avoid_: demolish, scrap, sell, destroy
+_Avoid_: demolish, scrap (that is a Ship's), sell, destroy
+
+**Scrap**:
+The Orders-phase order, since version 0.1.0.6, that breaks an empty Colony Ship up into a free Habitat at a Colony or station of its Faction's that its orbit touches: low orbit over a ground Colony, a station's own ring. It needs no Materials or Widgets, wants the Habitat's slot free, and lands at the Resolution; what is left in the tank is lost. The way out for a Stranded Colony Ship; a computer seat scraps one stranded three turns over a Colony of its own.
+_Avoid_: decommission (that is a building's), salvage, break up
 
 **Industry Level**:
 How built-up a Region is. Together with the state's size it sets how many Facilities fit, and every slot it adds is an Inland Slot. It scales the state's emissions. Since version 0.09.0 it adds one Widget a turn per level to the flat four every Region makes with no Factory, so a built-up Region builds a little faster on its own. Raising it is a build action. Since version 0.09.8 each raise costs more than the last, counted by how far the Region stands above the level on its card, whoever raised it.

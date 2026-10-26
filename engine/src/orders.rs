@@ -253,6 +253,9 @@ pub enum Order {
     /// control, once per state EVER. While it runs it doubles what they may recruit there and
     /// suspends Coach Class's double population charge.
     ExodusCall { state: StateId },
+    /// Ticket #637 (version 0.1.0.6), at the designer's word: an empty Colony Ship in the orbit that
+    /// touches a Colony of its seat's is broken up into a free Habitat there; its tank is lost.
+    Scrap { ship: ShipId, colony: ColonyId },
 }
 
 impl Order {
@@ -274,6 +277,8 @@ impl Order {
     pub fn build_module(&self) -> Option<(ColonyId, ModuleKind)> {
         match self {
             Order::BuildModule { colony, kind } | Order::BuildModuleWithDucats { colony, kind } => Some((*colony, *kind)),
+            // Ticket #637: a scrapped hull's Habitat takes its slot as a build ordered this turn does.
+            Order::Scrap { colony, .. } => Some((*colony, ModuleKind::Habitat)),
             _ => None,
         }
     }
@@ -379,7 +384,8 @@ pub fn is_ship_action(o: &Order, ship: ShipId) -> bool {
         | Order::Unload { ship: x, .. }
         | Order::Bombard { ship: x, .. }
         | Order::Launch { ship: x, .. }
-        | Order::Rearm { ship: x } => *x == ship,
+        | Order::Rearm { ship: x }
+        | Order::Scrap { ship: x, .. } => *x == ship,
         _ => false,
     }
 }
@@ -1321,7 +1327,38 @@ impl Game {
                 }
                 Ok(cost)
             }
+            Order::Scrap { ship, colony } => {
+                let Some(s) = self.ship(*ship) else { return fail("no such Ship") };
+                if s.seat != seat {
+                    return fail("not your Ship");
+                }
+                if s.kind != UnitKind::ColonyShip {
+                    return fail("only a Colony Ship is scrapped");
+                }
+                if s.colonists > 0 || s.army.is_some() {
+                    return fail("only an empty Colony Ship is scrapped");
+                }
+                let Some(col) = self.colony(*colony) else { return fail("no such Colony") };
+                if col.control.director() != Some(seat) {
+                    return fail("you do not direct this Colony");
+                }
+                if s.at != ShipAt::Body(col.body) || self.ship_orbit(s) != self.colony_orbit(col) {
+                    return fail(format!("only from {}, the orbit that touches {}", self.orbit_name(col.body, self.colony_orbit(col)), self.place_name(Place::Colony(*colony))));
+                }
+                // From the review: nor a load, a refuel or a route beside it, which the hull's
+                // removal would leave paid for and dangling.
+                if pending.iter().any(|o| is_ship_action(o, *ship) || is_load(o, *ship) || matches!(o, Order::Refuel { ship: x } | Order::SetRoute { ship: x, .. } if x == ship)) {
+                    return fail("this Ship already has an order");
+                }
+                // The Habitat's own rules: a slot free, among them.
+                self.check_order_rules(seat, pending, &Order::BuildModule { colony: *colony, kind: ModuleKind::Habitat })?;
+                Ok(Cost::default())
+            }
             Order::SetRoute { ship, route } => {
+                // Ticket #637 (version 0.1.0.6), from the review: not a hull being scrapped.
+                if pending.iter().any(|o| matches!(o, Order::Scrap { ship: x, .. } if x == ship)) {
+                    return fail("this Ship is being scrapped");
+                }
                 if pending.iter().any(|o| matches!(o, Order::SetRoute { ship: x, .. } if x == ship)) {
                     return fail("this Ship's route is already set this turn");
                 }
@@ -2106,6 +2143,10 @@ impl Game {
                 if s.seat != seat {
                     return fail("not your Ship");
                 }
+                // Ticket #637 (version 0.1.0.6), from the review: not a hull being scrapped.
+                if pending.iter().any(|o| matches!(o, Order::Scrap { ship: x, .. } if x == ship)) {
+                    return fail("this Ship is being scrapped");
+                }
                 let ShipAt::Body(body) = s.at else { return fail("in transit") };
                 // Ticket #325 (version 0.08.8): or a partner's station under a Refuel Accord.
                 if !self.refuel_station_at(seat, body) {
@@ -2354,6 +2395,10 @@ impl Game {
                 let Some(s) = self.ship(*ship) else { return fail("no such Ship") };
                 if s.seat != seat {
                     return fail("not your Ship");
+                }
+                // Ticket #637 (version 0.1.0.6), from the review: not a hull being scrapped.
+                if pending.iter().any(|o| matches!(o, Order::Scrap { ship: x, .. } if x == ship)) {
+                    return fail("this Ship is being scrapped");
                 }
                 let ShipAt::Body(body) = s.at else { return fail("in transit") };
                 let card = self.tables.unit(s.kind);
@@ -3358,6 +3403,17 @@ impl Game {
                     };
                     self.log(line);
                 }
+                Order::Scrap { ship, colony } => {
+                    let name = self.ship(*ship).map(|s| self.ship_name(s)).unwrap_or_default();
+                    self.ships.retain(|s| s.id != *ship);
+                    self.routes.retain(|r| r.ship != *ship);
+                    self.stranded_since.retain(|(id, _)| id != ship);
+                    if let Some(c) = self.colony_mut(*colony) {
+                        c.modules.push(Module::new(ModuleKind::Habitat));
+                    }
+                    self.war.scrapped[seat.index()] += 1;
+                    self.log(format!("{name} was scrapped into a Habitat at {}.", self.place_name(Place::Colony(*colony))));
+                }
                 Order::SetRoute { ship, route } => {
                     self.routes.retain(|r| r.ship != *ship);
                     let name = self.ship(*ship).map(|s| self.ship_name(s)).unwrap_or_default();
@@ -3873,6 +3929,10 @@ impl Game {
                 Some(p) => r("max_on", &[("place", place(*p))]),
                 None => r("max_off", &[]),
             },
+            Order::Scrap { ship, colony } => {
+                let ship = self.ship(*ship).map(|s| self.ship_name(s)).unwrap_or_else(|| "a Colony Ship".into());
+                r("scrap", &[("ship", ship), ("colony", place(Place::Colony(*colony)))])
+            }
             Order::SetRoute { ship, route } => {
                 let ship = self.ship(*ship).map(|s| self.ship_name(s)).unwrap_or_else(|| "a Colony Ship".into());
                 match route {

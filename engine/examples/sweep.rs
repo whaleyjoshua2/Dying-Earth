@@ -832,6 +832,8 @@ fn main() {
                             println!("      Fissionables bought / sold at the market over the batch, by seat {:?} / {:?}", warc.fission_bought, warc.fission_sold);
                             // Ticket #631 (version 0.1.0.6).
                             println!("      Ferry routes set / Colonists ferried / deliveries over the batch, by seat {:?} / {:?} / {:?}", warc.routes_set, warc.ferried, warc.ferry_trips);
+                            // Ticket #637 (version 0.1.0.6): empty Colony Ships scrapped into Habitats.
+                            println!("      Colony Ships scrapped into Habitats over the batch, by seat {:?}", warc.scrapped);
                             // Ticket #633 (version 0.1.0.6).
                             println!("      Games with the first child born off Earth, by seat {:?}", warc.first_born);
                             // Ticket #632 (version 0.1.0.6).

@@ -428,3 +428,28 @@ rule that counts an Army on Hold in a rival's held Region as on Attack (ticket #
 37, 102, 38 and 26, from 42, 110, 39 and 27. Reported, not tuned. Not measured: how often a computer
 seat's inherited Army now waits abroad for good -- the review reads `ai.rs` as never marching an
 Army home.
+
+## 12. Scrapping a Colony Ship into the Colony below
+
+Ticket: [Scrapping a Ship into the Colony below](https://github.com/whaleyjoshua2/Dying-Earth/issues/637).
+The designer: stranded Ships (tester 3's at Mercury, 0.6 Fuel) should scrap into the Colony below.
+
+- **Which** (Q1, Q5). An empty Colony Ship of the seat's -- no Colonists, no Army -- in the orbit that
+  touches a Colony or station of its own (low orbit over a ground Colony, a station's ring), stranded
+  or not, never in transit. Other hulls are never scrapped.
+- **The yield** (Q2, Q3). A free Habitat at that Colony: no Materials, no Widgets, standing at the
+  Resolution. The Habitat's own rules apply, a free slot among them (Q8: *full ...* otherwise).
+- **The tank** (Q4). Lost, Fuel and Fissionables both.
+- **Several Colonies under one orbit** (Q9). The player chooses: one button per Colony.
+- **The words** (Q6). *Scrap for a Habitat at Tycho*; hover *Breaks the hull up into a Habitat at
+  Tycho (+4 Colonists' room). Lands this turn.* Text tool: `scrap <ship> [colony]`.
+- **The computer** (Q7). Scraps an empty Colony Ship stranded `scrap_stranded_turns` (3) turns or more
+  over a Colony of its own, at the first with room.
+- **Beside other orders** (from the review). A Scrap and any other order on the same hull -- a
+  move, a load, a refuel, a route -- refuse each other.
+- **When.** It lands as the orders are committed, before the turn's Battles. Left for the designer.
+
+**Measured** ([`sweeps/ticket-637.txt`](../dev-diary/2026-10-25-version-0.1.0.6/sweeps/ticket-637.txt)):
+**32 / 45 / 1 / 2 and 0 collapses**, from §11's 29 / 48 / 1 / 2 and 0. Colony Ships scrapped over the
+80 games: the Prospectors 65, the Archivists 36, the Custodians 30, the Arkwrights 22. Ships stranded
+at the end: 109, from 244. Reported, not tuned.

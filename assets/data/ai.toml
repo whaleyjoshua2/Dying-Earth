@@ -608,6 +608,9 @@ fission_keep_turns = 20.0
 # place of its own it has delivered to before on a ferry route, and ends the route once the far end
 # has had no room for this many turns.
 ferry_idle_turns = 3
+# Ticket #637 (version 0.1.0.6), at the designer's word: a computer seat scraps an empty Colony Ship
+# stranded this many turns or more over a Colony of its own, into a Habitat there.
+scrap_stranded_turns = 3
 # Ticket #633 (version 0.1.0.6), at the designer's word: until somebody has the first child born off
 # Earth, the computer Arkwrights weigh a Habitat at, and a landing into, a Colony of theirs beyond
 # Earth orbit by this.

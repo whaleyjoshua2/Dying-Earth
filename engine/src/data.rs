@@ -1721,6 +1721,10 @@ pub struct AiThresholds {
     /// room for this many turns.
     #[serde(default = "ferry_idle_turns_default")]
     pub ferry_idle_turns: u32,
+    /// Ticket #637 (version 0.1.0.6): a computer seat scraps an empty Colony Ship stranded this
+    /// many turns over a Colony of its own.
+    #[serde(default = "scrap_stranded_turns_default")]
+    pub scrap_stranded_turns: u32,
     /// Ticket #633 (version 0.1.0.6): the computer Arkwrights' chase of the first birth off Earth.
     #[serde(default = "first_birth_chase_default")]
     pub first_birth_chase: f64,
@@ -3407,6 +3411,10 @@ fn fission_keep_turns_default() -> f64 {
 }
 
 fn ferry_idle_turns_default() -> u32 {
+    3
+}
+
+fn scrap_stranded_turns_default() -> u32 {
     3
 }
 

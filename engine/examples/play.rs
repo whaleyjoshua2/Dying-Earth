@@ -498,6 +498,8 @@ const GRAMMAR: &str = r#"ORDER LINES (one per line; `#` starts a comment; blank 
                                        for each leg's window unless `now`. Its step is placed for you
                                        each turn after your own lines, which stand first.
                                        `route <ship> off` ends it.
+  scrap <ship> [colony]                an empty Colony Ship broken up into a free Habitat at your
+                                       Colony below (the colony named, else the first with room)
   load <ship> <n> from <place> [army <army>]
                                        FREE OF THE SHIP'S TURN: a load
                                        off any place, Region, Colony or station, stands beside the
@@ -829,6 +831,24 @@ fn parse_line(g: &Game, line: &str) -> Result<Line, String> {
                 let s = g.ship(ship).ok_or("no such Ship")?;
                 let ShipAt::Body(home) = s.at else { return Err(format!("{} is in transit", g.ship_called(ship))) };
                 Order::SetRoute { ship, route: Some(Route::new(ship, home, s.slot, far, !at(3).is_ok_and(|w| w.eq_ignore_ascii_case("now")))) }
+            }
+        }
+        // Ticket #637 (version 0.1.0.6): an empty Colony Ship broken up into a Habitat at the Colony
+        // named, or at the first of the player's the orbit touches that has room.
+        "scrap" => {
+            let ship = ship_id(g, at(1)?)?;
+            match at(2) {
+                Ok(word) => Order::Scrap { ship, colony: colony_id(g, word)? },
+                Err(_) => {
+                    let orders: Vec<Order> = g.colonies.iter().filter(|c| c.control.director() == Some(Seat(0))).map(|c| Order::Scrap { ship, colony: c.id }).collect();
+                    match orders.iter().find(|o| g.check_order(Seat(0), &[], o).is_ok()) {
+                        Some(o) => o.clone(),
+                        None => return Err(match orders.first().map(|o| g.check_order(Seat(0), &[], o)) {
+                            Some(Err(e)) => e.0,
+                            _ => "no Colony of yours to scrap into".to_string(),
+                        }),
+                    }
+                }
             }
         }
         // Ticket #328 (version 0.08.8), and ticket #335 (version 0.09.0) for the orbit: the

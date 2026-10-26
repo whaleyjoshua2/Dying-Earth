@@ -466,6 +466,8 @@ max_on = "set its whole Allotment on {place} every turn"
 max_off = "set its Influence to be placed by hand again"
 route_on = "set {ship} to ferry to {colony}"
 route_off = "ended {ship}'s ferry route"
+# Ticket #637 (version 0.1.0.6): an empty Colony Ship broken up into a Habitat.
+scrap = "scrapped {ship} into a Habitat at {colony}"
 build_emigrants = "recruited {n} in {state}"
 send_antarctica = "sent {n} from {state} to Antarctica by sea"
 lift_station = "lifted {n} from {state} to {station}"

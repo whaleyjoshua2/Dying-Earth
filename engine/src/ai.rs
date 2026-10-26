@@ -4388,6 +4388,22 @@ impl Game {
                 }
             }
         }
+        // Ticket #637 (version 0.1.0.6), at the designer's word (Q7): an empty Colony Ship stranded
+        // `scrap_stranded_turns` turns or more over a Colony of its own is scrapped into a Habitat,
+        // at the first of those Colonies with room.
+        let stranded: Vec<ShipId> = self
+            .stranded_since
+            .iter()
+            .filter(|(id, since)| self.turn >= since + self.tables.ai.thresholds.scrap_stranded_turns && self.ship(*id).is_some_and(|s| s.seat == seat))
+            .map(|(id, _)| *id)
+            .collect();
+        for ship in stranded {
+            let colonies: Vec<ColonyId> = self.colonies.iter().filter(|c| c.control.director() == Some(seat)).map(|c| c.id).collect();
+            if let Some(scrap) = colonies.into_iter().map(|colony| Order::Scrap { ship, colony }).find(|o| self.check_order(seat, &chosen, o).is_ok()) {
+                lines.push(format!("  take          scrap {} into a Habitat", self.ship(ship).map(|s| self.ship_name(s)).unwrap_or_default()));
+                chosen.push(scrap);
+            }
+        }
         // Saving: once a legal, higher-scored action is out of reach now but within four more turns
         // of Materials income, Materials are held for it rather than spent on lower-scored actions
         // (ticket #56: one turn let a Factory bought every turn starve the Colony Ship for good).

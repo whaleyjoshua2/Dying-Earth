@@ -272,6 +272,9 @@ pub struct SavedGame {
     /// Ticket #633 (version 0.1.0.6): the first children born off Earth.
     #[serde(default)]
     pub first_born: Vec<(Seat, ColonyId, u32)>,
+    /// Ticket #637 (version 0.1.0.6): each stranded Ship and the turn it was first found so.
+    #[serde(default)]
+    pub stranded_since: Vec<(ShipId, u32)>,
     #[serde(default)]
     pub refusals: Vec<crate::state::Refusal>,
     /// Ticket #572 (version 0.1.0.3): the last Trade refused per pair, by its goods.
@@ -372,6 +375,7 @@ impl SavedGame {
             offers,
             routes,
             first_born,
+            stranded_since,
             refusals,
             refused_trades,
             armies_inherited,
@@ -418,6 +422,7 @@ impl SavedGame {
             offers: offers.clone(),
             routes: routes.clone(),
             first_born: first_born.clone(),
+            stranded_since: stranded_since.clone(),
             refusals: refusals.clone(),
             refused_trades: refused_trades.clone(),
             armies_inherited: armies_inherited.clone(),
@@ -480,6 +485,7 @@ impl SavedGame {
             offers: self.offers,
             routes: self.routes,
             first_born: self.first_born,
+            stranded_since: self.stranded_since,
             refusals: self.refusals,
             refused_trades: self.refused_trades,
             armies_inherited: self.armies_inherited,

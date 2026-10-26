@@ -21108,7 +21108,8 @@ fn the_reports_templates_stay_under_their_word_ceiling() {
     // Ticket #633 (version 0.1.0.6): and by the 18 of the first child born off Earth, its line and Moment.
     // Ticket #632 (version 0.1.0.6): and by the 28 of refugees sent to the stars, and the lack.
     // Ticket #636 (version 0.1.0.6): and by the 6 of an inherited Army waiting on Hold.
-    assert!(words <= 2076, "the Report's templates hold {words} words; the ceiling is 2,076 (6 for an Army waiting on Hold, 28 for refugees sent to the stars, 18 for the first child born off Earth, 39 for a ferry route, 9 for Fissionables run short, 10 for a Strip Permit's clauses, 9 for an Occupation's holder, 15 for a rival on yours, 33 for a window and the head, 46 for an Accord's end, 9 for a place handed over twice, 9 for an Army inherited, 12 for an Accord broken, 15% off 2,031, 54 for the race to the Moon, 2 for a rival's upgrade, 8 for an Accord answered, less a word of slack, 17 for a Trade, 9 for a Capital refunded, 5 for an Accord let lapse, 7 for Terms added, 5 for a renewal)");
+    // Ticket #637 (version 0.1.0.6): and by the 7 of a Colony Ship scrapped.
+    assert!(words <= 2083, "the Report's templates hold {words} words; the ceiling is 2,083 (7 for a scrapped hull, 6 for an Army waiting on Hold, 28 for refugees sent to the stars, 18 for the first child born off Earth, 39 for a ferry route, 9 for Fissionables run short, 10 for a Strip Permit's clauses, 9 for an Occupation's holder, 15 for a rival on yours, 33 for a window and the head, 46 for an Accord's end, 9 for a place handed over twice, 9 for an Army inherited, 12 for an Accord broken, 15% off 2,031, 54 for the race to the Moon, 2 for a rival's upgrade, 8 for an Accord answered, less a word of slack, 17 for a Trade, 9 for a Capital refunded, 5 for an Accord let lapse, 7 for Terms added, 5 for a renewal)");
     // "The" is gone before a Faction's name, which is drawn in its colour instead.
     assert!(!text.contains("he {faction}"), "a template still says \"the {{faction}}\"");
 }
@@ -27588,4 +27589,149 @@ fn ticket_635_a_mixed_stack_gives_the_most_held_stance() {
     g.army_mut(tie).unwrap().stance = Stance::DigIn;
     let most = g.raise_army(place, false);
     assert_eq!(g.army(most).unwrap().stance, Stance::DigIn, "two of three are dug in");
+}
+
+// ---------------------------------------------------------------- 0.1.0.6 ticket #637: scrapping a Colony Ship
+
+/// Ticket #637 (version 0.1.0.6), at the designer's word: an empty Colony Ship in the orbit that
+/// touches a Colony of its seat's is broken up into a free Habitat there (Q2, Q3); what is left in
+/// its tank is lost (Q4).
+#[test]
+fn ticket_637_an_empty_colony_ship_scraps_into_a_habitat() {
+    let mut g = game();
+    let c = colony(&mut g, Seat(0), BodyId::Moon, &[], 3);
+    let ship = ship_in(&mut g, Seat(0), UnitKind::ColonyShip, BodyId::Moon, None, Stance::Hold);
+    g.ship_mut(ship).unwrap().colonists = 0;
+    let habitats = |g: &Game| g.colony(c).unwrap().modules.iter().filter(|m| m.kind == ModuleKind::Habitat).count();
+    let before = habitats(&g);
+    let scrap = Order::Scrap { ship, colony: c };
+    assert_eq!(g.check_order(Seat(0), &[], &scrap).map(|c| c.materials), Ok(0.0), "free");
+    g.commit_orders(Seat(0), &[scrap]);
+    g.resolution_phase();
+    assert!(g.ship(ship).is_none(), "the hull is gone");
+    assert_eq!(habitats(&g), before + 1, "a Habitat stands");
+}
+
+/// Ticket #637 (Q5, Q8): a Colony Ship only, empty, in the orbit that touches the seat's own Colony,
+/// with a slot free.
+#[test]
+fn ticket_637_scrapping_is_refused_where_it_does_not_apply() {
+    let mut g = game();
+    let c = colony(&mut g, Seat(0), BodyId::Moon, &[], 3);
+    let ship = ship_in(&mut g, Seat(0), UnitKind::ColonyShip, BodyId::Moon, None, Stance::Hold);
+    g.ship_mut(ship).unwrap().colonists = 0;
+    let err = |g: &Game, o: Order| g.check_order(Seat(0), &[], &o).unwrap_err().0;
+    let frigate = ship_in(&mut g, Seat(0), UnitKind::Frigate, BodyId::Moon, None, Stance::Hold);
+    assert!(err(&g, Order::Scrap { ship: frigate, colony: c }).contains("Colony Ship"));
+    g.ship_mut(ship).unwrap().colonists = 2;
+    assert!(err(&g, Order::Scrap { ship, colony: c }).contains("empty"));
+    g.ship_mut(ship).unwrap().colonists = 0;
+    g.ship_mut(ship).unwrap().slot = Some(0);
+    assert!(err(&g, Order::Scrap { ship, colony: c }).contains("orbit"));
+    g.ship_mut(ship).unwrap().slot = None;
+    let theirs = colony(&mut g, Seat(1), BodyId::Moon, &[], 3);
+    assert!(err(&g, Order::Scrap { ship, colony: theirs }).contains("direct"));
+    let rival_hull = ship_in(&mut g, Seat(1), UnitKind::ColonyShip, BodyId::Moon, None, Stance::Hold);
+    g.ship_mut(rival_hull).unwrap().colonists = 0;
+    assert!(err(&g, Order::Scrap { ship: rival_hull, colony: c }).contains("not your Ship"));
+    // Q8: no free slot.
+    while g.free_module_slots(g.colony(c).unwrap()) > 0 {
+        g.colony_mut(c).unwrap().modules.push(Module::new(ModuleKind::Mine));
+    }
+    assert!(err(&g, Order::Scrap { ship, colony: c }).contains("full"));
+}
+
+/// Ticket #637 (Q7): a computer seat scraps an empty Colony Ship stranded three turns or more over
+/// a Colony of its own.
+#[test]
+fn ticket_637_the_computer_scraps_a_ship_stranded_three_turns() {
+    let mut g = game();
+    let seat = Seat(1);
+    assert!(g.seat(seat).ai);
+    let c = colony(&mut g, seat, BodyId::Mercury, &[], 3);
+    let ship = ship_in(&mut g, seat, UnitKind::ColonyShip, BodyId::Mercury, None, Stance::Hold);
+    { let s = g.ship_mut(ship).unwrap(); s.colonists = 0; s.fuel = 0.6; }
+    assert!(g.stranded(ship), "the premise: stranded");
+    let scraps = |g: &mut Game| g.ai_orders(seat).iter().any(|o| matches!(o, Order::Scrap { ship: s, colony: x } if *s == ship && *x == c));
+    for _ in 0..2 {
+        g.resolution_phase();
+        g.turn += 1;
+        g.ship_mut(ship).unwrap().fuel = 0.6;
+        assert!(!scraps(&mut g.clone()), "not before three turns");
+    }
+    g.resolution_phase();
+    g.turn += 1;
+    g.ship_mut(ship).unwrap().fuel = 0.6;
+    assert!(scraps(&mut g.clone()), "stranded three turns: scrapped");
+    // Rescued, then stranded again: the count starts afresh.
+    g.ship_mut(ship).unwrap().fuel = 1000.0;
+    assert!(!g.stranded(ship), "rescued");
+    g.resolution_phase();
+    g.turn += 1;
+    g.ship_mut(ship).unwrap().fuel = 0.6;
+    g.resolution_phase();
+    g.turn += 1;
+    g.ship_mut(ship).unwrap().fuel = 0.6;
+    assert!(!scraps(&mut g.clone()), "stranded again a turn: not yet");
+}
+
+/// Ticket #637, from the review: the cases the first tests left open. A station's ring is the
+/// orbit that touches the station; an Army aboard, a hull in transit, a slot taken by a build
+/// ordered this turn, and any other order naming the hull refuse it, and a Scrap refuses those
+/// orders in turn; the Stockpile gains nothing from the tank; the computer leaves a stranded hull
+/// with people aboard.
+#[test]
+fn ticket_637_the_reviews_cases() {
+    let mut g = game();
+    let iss = station_of(&g, Seat(0), BodyId::Earth).expect("the ISS");
+    let ring = g.colony(iss).unwrap().slot;
+    let ship = ship_in(&mut g, Seat(0), UnitKind::ColonyShip, BodyId::Earth, Some(ring), Stance::Hold);
+    g.ship_mut(ship).unwrap().colonists = 0;
+    let scrap = Order::Scrap { ship, colony: iss };
+    assert!(g.check_order(Seat(0), &[], &scrap).is_ok(), "from the station's ring: {:?}", g.check_order(Seat(0), &[], &scrap));
+    let err = |g: &Game, pending: &[Order], o: &Order| g.check_order(Seat(0), pending, o).unwrap_err().0;
+    // Every other order on the hull refuses the Scrap, and the Scrap refuses them.
+    let others = [
+        Order::Refuel { ship },
+        Order::Load { ship, colonists: 1, from: LoadSource::Colony(iss), army: None },
+        Order::SetRoute { ship, route: None },
+        Order::Transit { ship, to: BodyId::Moon, slot: None },
+    ];
+    for o in &others {
+        assert!(err(&g, std::slice::from_ref(o), &scrap).contains("already has an order"), "{o:?} then Scrap");
+        if !matches!(o, Order::Transit { .. }) {
+            assert!(err(&g, std::slice::from_ref(&scrap), o).contains("scrapped"), "Scrap then {o:?}");
+        }
+    }
+    // A build ordered this turn takes the last slot.
+    let col = g.colony(iss).unwrap().clone();
+    while g.free_module_slots(g.colony(iss).unwrap()) > 1 {
+        g.colony_mut(iss).unwrap().modules.push(Module::new(ModuleKind::Habitat));
+    }
+    let build = Order::BuildModule { colony: iss, kind: ModuleKind::Habitat };
+    assert!(g.check_order(Seat(0), &[], &build).is_ok());
+    assert!(err(&g, std::slice::from_ref(&build), &scrap).contains("full"));
+    g.colony_mut(iss).unwrap().modules = col.modules;
+    // The tank is lost: the Stockpile's Fuel does not move.
+    let fuel = g.seats[0].stockpile.fuel;
+    g.commit_orders(Seat(0), std::slice::from_ref(&scrap));
+    assert!(g.ship(ship).is_none());
+    assert_eq!(g.seats[0].stockpile.fuel, fuel, "nothing from the tank");
+    // An Army aboard, and a hull in transit.
+    let carrier_like = ship_in(&mut g, Seat(0), UnitKind::ColonyShip, BodyId::Earth, Some(ring), Stance::Hold);
+    g.ship_mut(carrier_like).unwrap().colonists = 0;
+    let army = g.armies[0].id;
+    g.ship_mut(carrier_like).unwrap().army = Some(army);
+    assert!(err(&g, &[], &Order::Scrap { ship: carrier_like, colony: iss }).contains("empty"));
+    g.ship_mut(carrier_like).unwrap().army = None;
+    g.ship_mut(carrier_like).unwrap().at = ShipAt::Transit { from: BodyId::Moon, to: BodyId::Earth, turns_left: 2 };
+    assert!(err(&g, &[], &Order::Scrap { ship: carrier_like, colony: iss }).contains("orbit"));
+    // The computer leaves a stranded hull with people aboard.
+    let seat = Seat(1);
+    let c = colony(&mut g, seat, BodyId::Mercury, &[], 3);
+    let full = ship_in(&mut g, seat, UnitKind::ColonyShip, BodyId::Mercury, None, Stance::Hold);
+    { let s = g.ship_mut(full).unwrap(); s.colonists = 2; s.fuel = 0.6; }
+    g.stranded_since.push((full, 0));
+    g.turn += 5;
+    assert!(!g.clone().ai_orders(seat).iter().any(|o| matches!(o, Order::Scrap { ship: s, colony: x } if *s == full && *x == c)), "people aboard: no scrap");
 }

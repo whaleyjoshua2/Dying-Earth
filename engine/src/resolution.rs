@@ -96,6 +96,14 @@ impl Game {
         for a in &mut self.armies {
             a.move_to = None;
         }
+        // Ticket #637 (version 0.1.0.6): each stranded Ship, and the turn it was first found so.
+        let stranded: Vec<ShipId> = self.ships.iter().map(|s| s.id).filter(|id| self.stranded(*id)).collect();
+        self.stranded_since.retain(|(id, _)| stranded.contains(id));
+        for id in stranded {
+            if !self.stranded_since.iter().any(|(x, _)| *x == id) {
+                self.stranded_since.push((id, self.turn));
+            }
+        }
     }
 
     /// Ticket #370 (version 0.09.2): **the player's Colonists still aboard a Ship off Earth are

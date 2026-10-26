@@ -5794,6 +5794,7 @@ fn order_text(game: &Game, earlier: &[Order], o: &Order) -> String {
         Order::SetMaxStanding { target: None } => "Place your Influence by hand again".to_string(),
         Order::SetRoute { route: Some(r), .. } => format!("Set {}", game.route_text(r).replacen("Ferry: ", "a ferry route: ", 1)),
         Order::SetRoute { ship, route: None } => format!("End {}'s ferry route", game.ship(*ship).map(|s| game.ship_name(s)).unwrap_or_else(|| "a Ship".into())),
+        Order::Scrap { ship, colony } => format!("Scrap {} for a Habitat at {}", game.ship(*ship).map(|s| game.ship_name(s)).unwrap_or_else(|| "a Ship".into()), game.place_name(Place::Colony(*colony))),
         Order::SetResearchDirective { percent: 0 } => "Pay all your Research into the shared Tech from the next Income".to_string(),
         Order::SetResearchDirective { percent } => format!("Direct {percent}% of your Research from the next Income"),
         // Ticket #73.
@@ -9658,12 +9659,31 @@ fn ship_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
     move_dropdowns(ui, session, game, body, &[s], Some(s), view.stack_scroll, &format!("ship{}", s.id.0), actions);
     ship_cargo_block(ui, session, game, s, body, actions);
     ship_ferry_block(ui, session, game, view, s, body, actions);
+    ship_scrap_block(ui, session, game, s, body, actions);
     if s.damage > 0 {
         ui.label(RichText::new("Repair").strong());
         cost_button(ui, game, &session.pending, Order::Repair { unit: UnitRef::Ship(s.id), points: s.damage }, "Repair fully", actions);
         cost_button(ui, game, &session.pending, Order::RepairWithDucats { unit: UnitRef::Ship(s.id), points: s.damage }, "Repair fully with Ducats", actions);
     }
     ship_weapons_block(ui, session, game, view, s, body, actions);
+}
+
+/// Ticket #637 (version 0.1.0.6), at the designer's word: an empty Colony Ship in the orbit that
+/// touches a Colony of the player's is offered one Scrap button per such Colony.
+fn ship_scrap_block(ui: &mut Ui, session: &Session, game: &Game, s: &Ship, body: BodyId, actions: &mut Vec<Action>) {
+    if s.kind != UnitKind::ColonyShip || s.colonists > 0 || s.army.is_some() {
+        return;
+    }
+    let below: Vec<&Colony> = game.colonies.iter().filter(|c| c.body == body && c.control.director() == Some(Seat(0)) && game.colony_orbit(c) == game.ship_orbit(s)).collect();
+    if below.is_empty() {
+        return;
+    }
+    ui.label(RichText::new("Scrap").strong());
+    for c in below {
+        let name = game.place_name(Place::Colony(c.id));
+        let hover = format!("Breaks the hull up into a Habitat at {name} (+{} Colonists' room). Lands this turn.", game.habitat_holds(c));
+        orders_button(ui, game, &session.pending, vec![Order::Scrap { ship: s.id, colony: c.id }], &format!("Scrap for a Habitat at {name}"), Some(hover), actions);
+    }
 }
 
 /// Ticket #631 (version 0.1.0.6), at the designer's word: **a Colony Ship's ferry route**. On a
@@ -10830,7 +10850,11 @@ Build", Color32::from_gray(165)) } else { ("free", Color32::from_gray(130)) };
                 }
                 let gold = Color32::from_rgb(250, 210, 130);
                 clipped.text(rect.left_bottom() + egui::vec2(4.0, -4.0), egui::Align2::LEFT_BOTTOM, if ordered { "ordered" } else { "building" }, FontId::proportional(11.0), gold);
-                clipped.text(rect.right_top() + egui::vec2(-4.0, 4.0), egui::Align2::RIGHT_TOP, format!("{done} of {widgets}"), FontId::proportional(11.0), gold);
+                // Ticket #637 (version 0.1.0.6): a build that wants no Widgets (a scrapped hull's
+                // Habitat) has no count to show.
+                if widgets > 0 {
+                    clipped.text(rect.right_top() + egui::vec2(-4.0, 4.0), egui::Align2::RIGHT_TOP, format!("{done} of {widgets}"), FontId::proportional(11.0), gold);
+                }
             }
             if state == TileState::Mothballed {
                 ui.painter().text(rect.left_bottom() + egui::vec2(4.0, -4.0), egui::Align2::LEFT_BOTTOM, "mothballed", FontId::proportional(11.0), Color32::from_rgb(170, 170, 190));
@@ -11154,9 +11178,16 @@ fn module_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
         // Ticket #291: ordered this turn; right-click takes the order back. Ticket #332: the face
         // reads `0 of 8`, nothing being done on it until the turn ends; the hover the estimate.
         // Ticket #505 (version 0.1.0.0): at this Colony's figure, which Regolith Printing cuts.
-        let widgets = game.build_widgets_at(Seat(0), Place::Colony(cid), BuildItem::Module(*kind));
+        // Ticket #637 (version 0.1.0.6), from the review: a scrapped hull's Habitat wants no
+        // Widgets and lands this turn.
+        let scrap = matches!(session.pending.get(*pi), Some(Order::Scrap { .. }));
+        let widgets = if scrap { 0 } else { game.build_widgets_at(Seat(0), Place::Colony(cid), BuildItem::Module(*kind)) };
         let turns = game.turns_to_build(Seat(0), Place::Colony(cid), BuildItem::Module(*kind));
-        let tip = format!("{}: ordered this turn, {widgets} Widgets, {} once the turn ends.\nRight-click to cancel the order.", kind.name(), estimate_words(turns));
+        let tip = if scrap {
+            format!("{}: from the scrapped hull. Lands this turn.\nRight-click to cancel the order.", kind.name())
+        } else {
+            format!("{}: ordered this turn, {widgets} Widgets, {} once the turn ends.\nRight-click to cancel the order.", kind.name(), estimate_words(turns))
+        };
         if hab_tile(ui, tile_rect(i), ui.id().with(("hab-ordered", oi)), Some(crate::icons::module_icon(*kind)), kind.name(), TileState::Building { ordered: true, done: 0, widgets }, false, None, tip).secondary_clicked() {
             actions.push(Action::Cancel(*pi));
         }

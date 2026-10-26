@@ -722,6 +722,19 @@ fn build_board(session: &mut Session) {
             }
             g.seats[0].stockpile.fuel = 100.0;
         }
+        // `scrap:1` (a building aid, ticket #637, version 0.1.0.6): the playtest's case -- an empty
+        // Colony Ship of seat 0's stranded in Mercury's low orbit with 0.6 Fuel, over a Colony of seat
+        // 0's -- so its card (`stack:mercury ship:1`) carries the Scrap button.
+        if std::env::args().any(|a| a == "scrap:1") {
+            let body = BodyId::Mercury;
+            let slot = g.free_slots_on(body)[0];
+            let cid = ColonyId(g.fresh_id());
+            let modules = [ModuleKind::Core, ModuleKind::Mine].map(Module::new).to_vec();
+            g.colonies.push(Colony { id: cid, body, slot, control: Control::Controlled(Seat(0)), modules, colonists: 4, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: g.turn, tier: 0, in_orbit: false });
+            let id = ShipId(g.fresh_id());
+            let name = g.next_ship_name(UnitKind::ColonyShip);
+            g.ships.push(Ship { nuclear: false, fissionables: 0.0, id, name, kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(body), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: g.turn, fuel: 0.6, slot: None });
+        }
         // `drybar:1` (a building aid, ticket #346, version 0.09.1): **the board the Battle bar is
         // photographed on.** Seat 0 keeps a DRY Frigate -- 1 Fuel, under the 2 a Battle charges --
         // and a full Battleship in the SAME orbit over Mars, so one picture carries both readings
@@ -1769,6 +1782,19 @@ fn build_board(session: &mut Session) {
         && !session.place(Order::BuildModule { colony: cid, kind })
     {
         eprintln!("morder:{name} was refused");
+        std::process::exit(3);
+    }
+    // `scrap:order` (ticket #637): the Scrap of `scrap:1`'s Colony Ship is placed, so the Colony's
+    // grid carries the Habitat it will become.
+    if std::env::args().any(|a| a == "scrap:order")
+        && let Some((ship, colony)) = session.game.as_ref().and_then(|g| {
+            let ship = g.ships.iter().find(|s| s.seat == Seat(0) && s.kind == UnitKind::ColonyShip && s.at == ShipAt::Body(BodyId::Mercury))?.id;
+            let colony = g.colonies.iter().find(|c| c.body == BodyId::Mercury && c.control.director() == Some(Seat(0)))?.id;
+            Some((ship, colony))
+        })
+        && !session.place(Order::Scrap { ship, colony })
+    {
+        eprintln!("scrap:order was refused");
         std::process::exit(3);
     }
     // `bombard:order` (ticket #328): the Bombard of `bombard:1`'s Battleship at the rival Colony

@@ -1376,6 +1376,9 @@ pub struct WarCounters {
     pub ferried: [u32; SEAT_COUNT],
     #[serde(default)]
     pub ferry_trips: [u32; SEAT_COUNT],
+    /// Ticket #637 (version 0.1.0.6): Colony Ships scrapped into Habitats, by seat.
+    #[serde(default)]
+    pub scrapped: [u32; SEAT_COUNT],
     /// Ticket #633 (version 0.1.0.6): games in which the seat had the first child born off Earth.
     #[serde(default)]
     pub first_born: [u32; SEAT_COUNT],
@@ -1500,6 +1503,7 @@ impl WarCounters {
             self.routes_set[i] += o.routes_set[i];
             self.ferried[i] += o.ferried[i];
             self.ferry_trips[i] += o.ferry_trips[i];
+            self.scrapped[i] += o.scrapped[i];
             self.first_born[i] += o.first_born[i];
             self.stars_sent[i] += o.stars_sent[i];
             self.stars_lost[i] += o.stars_lost[i];
@@ -1938,6 +1942,9 @@ pub struct Game {
     /// Ticket #633 (version 0.1.0.6): the first children born off Earth -- each seat first on the
     /// turn it happened, its Colony and the turn. Empty until then. In the save.
     pub first_born: Vec<(Seat, ColonyId, u32)>,
+    /// Ticket #637 (version 0.1.0.6): each stranded Ship and the turn it was first found so, for
+    /// the computer's scrap. Read at the end of every Resolution. In the save.
+    pub stranded_since: Vec<(ShipId, u32)>,
     /// Ticket #519 (version 0.1.0.0): Armies abroad that changed hands with their Region, and the
     /// turn they did, exempt from the rule that puts a rival's guest on Attack -- for a turn then,
     /// and since ticket #636 (version 0.1.0.6) until their holder marches, boards or orders them to
@@ -2211,6 +2218,7 @@ impl Game {
             offers: Vec::new(),
             routes: Vec::new(),
             first_born: Vec::new(),
+            stranded_since: Vec::new(),
             armies_inherited: Vec::new(),
             refusals: Vec::new(),
             refused_trades: Vec::new(),
