@@ -481,6 +481,12 @@ and the computer leaving a hull with people aboard; three more rules broken on p
 Left for the designer: the Scrap lands when the orders are committed, before the turn's Battles, so
 an empty Colony Ship about to be destroyed can become a Habitat instead.
 
+**Afterwards**, on seeing the Mercury picture again: *"the stranded warning in ticket 637 is way too
+wordy"*. The red line had carried the fact and three ways out in two sentences; it is the fact alone
+now, *stranded: no leg it can pay*, and the ways out, the Scrap among them, are its hover.
+
+![The stranded line, cut](ticket-637/stranded-mercury.png)
+
 **The sweep** ([`sweeps/ticket-637.txt`](sweeps/ticket-637.txt)): **32 / 45 / 1 / 2 and 0 collapses**,
 from 29 / 48 / 1 / 2; 153 Colony Ships scrapped, and the Ships stranded at the end fell from 244 to 109.
 

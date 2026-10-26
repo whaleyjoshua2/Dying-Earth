@@ -448,6 +448,9 @@ The designer: stranded Ships (tester 3's at Mercury, 0.6 Fuel) should scrap into
 - **Beside other orders** (from the review). A Scrap and any other order on the same hull -- a
   move, a load, a refuel, a route -- refuse each other.
 - **When.** It lands as the orders are committed, before the turn's Battles. Left for the designer.
+- **The stranded warning**, after the ticket, at the designer's word (*"way too wordy"*): the Ship
+  card's red line is *stranded: no leg it can pay*; the ways out -- a station of yours, a working
+  Refinery Colony under low orbit, a Refuel Accord, or the Scrap -- are its hover.
 
 **Measured** ([`sweeps/ticket-637.txt`](../dev-diary/2026-10-25-version-0.1.0.6/sweeps/ticket-637.txt)):
 **32 / 45 / 1 / 2 and 0 collapses**, from §11's 29 / 48 / 1 / 2 and 0. Colony Ships scrapped over the

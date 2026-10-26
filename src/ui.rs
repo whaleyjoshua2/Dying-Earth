@@ -9691,8 +9691,11 @@ fn ship_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
                     cost_button_with_hover(ui, game, &session.pending, Order::Refuel { ship: s.id }, "Refuel from the Stockpile", partner, actions);
                 } else if game.stranded(s.id) {
                     ui.label(fuel);
-                    // Ticket #396 (version 0.09.3): or a Refinery Colony under low orbit.
-                    ui.colored_label(Color32::from_rgb(230, 120, 90), "stranded: no leg it can pay, and nothing of yours or of a Refuel partner's here to refuel at. A station in orbit here, a working Refinery at a Colony of yours on the ground, or a Refuel Accord with one who holds either, rescues it.");
+                    // Ticket #396 (version 0.09.3): or a Refinery Colony under low orbit. After
+                    // ticket #637 (version 0.1.0.6), at the designer's word -- "way too wordy" --
+                    // the line is the fact and the ways out are its hover.
+                    ui.colored_label(Color32::from_rgb(230, 120, 90), "stranded: no leg it can pay")
+                        .on_hover_text("Rescued by a station of yours here, a working Refinery Colony of yours under low orbit, or a Refuel Accord with one who holds either. Or scrap it, if it is an empty Colony Ship over a Colony of yours.");
                 } else {
                     ui.label(format!("{fuel}; no station or Refinery Colony of yours, or of a Refuel partner's, here to refuel at"));
                 }
